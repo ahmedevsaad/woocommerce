@@ -354,7 +354,7 @@ describe( 'settings HTML rendering', () => {
 		container.remove();
 	} );
 
-	it( 'sanitizes native field descriptions before rendering', () => {
+	it( 'sanitizes field descriptions before rendering', () => {
 		const schema: SettingsUISchema = {
 			id: 'test-page',
 			title: 'Test page',
@@ -385,7 +385,7 @@ describe( 'settings HTML rendering', () => {
 		container.remove();
 	} );
 
-	it( 'hides fields with unmet native visibility rules', () => {
+	it( 'hides fields with unmet schema visibility rules', () => {
 		const schema: SettingsUISchema = {
 			id: 'test-page',
 			title: 'Test page',
@@ -1006,12 +1006,12 @@ describe( 'settings HTML rendering', () => {
 
 		expect( container.textContent ).toContain( 'Info field' );
 
-		// The info description keeps sanitized markup; the group description
-		// renders as plain text, so only the info strong tag survives.
+		// The info description keeps sanitized markup while the group
+		// description and the DataForm field label render as plain text.
 		const strongTexts = Array.from(
 			container.querySelectorAll( 'strong' )
 		).map( ( el ) => el.textContent );
-		expect( strongTexts ).toEqual( [ 'Info field', 'Safe' ] );
+		expect( strongTexts ).toEqual( [ 'Safe' ] );
 		expect( container.querySelector( 'script' ) ).toBeNull();
 		expect( container.querySelector( 'img' ) ).toBeNull();
 		expect( container.querySelector( 'iframe' ) ).toBeNull();

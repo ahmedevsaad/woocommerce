@@ -117,7 +117,7 @@ describe( 'dataform adapter', () => {
 			expect( field.elements ).toEqual( options );
 		} );
 
-		it( 'renders info fields read-only through the native renderer', () => {
+		it( 'renders sanitized info content without a Woo-owned control', () => {
 			const infoField: SettingsUIField = {
 				id: 'info_field',
 				label: 'Read this',
@@ -134,14 +134,18 @@ describe( 'dataform adapter', () => {
 
 			const Render = field.render as ( props: {
 				item: SettingsValues;
+				field: typeof field;
 			} ) => JSX.Element;
 			const { container, unmount } = renderElement(
-				<Render item={ {} } />
+				<Render item={ {} } field={ field } />
 			);
 			expect(
 				container.querySelector( '.wc-settings-ui__info' )
-			).not.toBeNull();
-			expect( container.textContent ).toContain( 'Read this' );
+			).toBeNull();
+			expect( container.textContent ).toBe( 'Useful information.' );
+			expect( container.querySelector( 'strong' )?.textContent ).toBe(
+				'information'
+			);
 			unmount();
 		} );
 
