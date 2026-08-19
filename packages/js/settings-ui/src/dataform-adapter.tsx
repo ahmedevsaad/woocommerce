@@ -12,9 +12,11 @@ import type {
 /**
  * Internal dependencies
  */
-import { error, warn } from './diagnostics';
+import { error } from './diagnostics';
+import { sanitizeSettingsHtml } from './html';
 import { NativeSettingsField } from './native-fields';
 import {
+	resolveFieldComponent,
 	resolveFieldVisibilityPredicate,
 	resolveGroupVisibilityPredicate,
 } from './registry';
@@ -29,8 +31,7 @@ import type {
 } from './types';
 
 // The adapter assumes the canonical value vocabulary from the PHP schema
-// builder and how extension components attach is a renderer concern, so
-// neither value coercion nor component registry resolution happens here.
+// builder, so no value coercion happens here.
 
 export type DataFormAdapterOptions = {
 	schema: SettingsUISchema;
@@ -41,6 +42,26 @@ export type DataFormAdapterOptions = {
 export type DataFormAdapter = {
 	fields: Field< SettingsValues >[];
 	getForm: ( values: SettingsValues ) => Form;
+};
+
+const toSanitizedDescription = ( description?: string ) =>
+	description ? (
+		<span
+			dangerouslySetInnerHTML={ {
+				__html: sanitizeSettingsHtml( description ),
+			} }
+		/>
+	) : undefined;
+
+// FormField descriptions are plain strings, so group descriptions lose markup.
+const toPlainText = ( html?: string ) => {
+	if ( ! html ) {
+		return undefined;
+	}
+
+	const container = document.createElement( 'div' );
+	container.innerHTML = sanitizeSettingsHtml( html );
+	return container.textContent || undefined;
 };
 
 const areValuesEqual = ( a: SettingsValue, b: SettingsValue ) => {
@@ -188,11 +209,15 @@ export const buildDataFormField = (
 	options: DataFormAdapterOptions
 ): Field< SettingsValues > => {
 	const descriptor = settingsTypeDescriptors[ settingsField.type ];
+	const registeredComponent = resolveFieldComponent(
+		settingsField,
+		options.context
+	);
 
 	const field: Field< SettingsValues > = {
 		id: settingsField.id,
 		label: settingsField.label,
-		description: settingsField.description,
+		description: toSanitizedDescription( settingsField.description ),
 		placeholder: settingsField.placeholder,
 		type: descriptor?.type ?? 'text',
 		elements: settingsField.options,
@@ -200,19 +225,33 @@ export const buildDataFormField = (
 		isDisabled: isFieldDisabled( settingsField ),
 	};
 
+	if ( registeredComponent ) {
+		// A registered control accepts a frozen subset of the DataForm control
+		// props, so the wider package props remain assignable to it.
+		field.Edit = registeredComponent as Field< SettingsValues >[ 'Edit' ];
+		return field;
+	}
+
+	// A field declaring a component requires that custom control. Failing
+	// closed beats silently rendering a native field in its place.
+	if ( settingsField.component ) {
+		throw new Error(
+			`Component "${ settingsField.component }" is not registered.`
+		);
+	}
+
 	if ( settingsField.type === 'info' ) {
 		field.readOnly = true;
 		field.render = createInfoRender( settingsField, options );
 		return field;
 	}
 
+	// An unsupported type fails closed rather than silently dropping the
+	// field beside a live Save button.
 	if ( ! descriptor ) {
-		warn( `Field type "${ settingsField.type }" is not supported.`, {
-			field: settingsField,
-		} );
-		field.readOnly = true;
-		field.render = () => null;
-		return field;
+		throw new Error(
+			`Field type "${ settingsField.type }" is not supported.`
+		);
 	}
 
 	field.Edit = descriptor.edit;
@@ -223,6 +262,7 @@ export const buildDataFormField = (
 const buildGroupFormField = ( group: SettingsUIGroup ): FormField => ( {
 	id: group.id,
 	label: group.title || undefined,
+	description: toPlainText( group.description ),
 	layout: group.title
 		? { type: 'card', isCollapsible: false }
 		: { type: 'card', withHeader: false },

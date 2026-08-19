@@ -145,23 +145,86 @@ describe( 'dataform adapter', () => {
 			unmount();
 		} );
 
-		it( 'warns and maps an unknown type to a read-only field rendering nothing', () => {
-			const warnSpy = jest
-				.spyOn( console, 'warn' )
-				.mockImplementation( () => undefined );
+		it( 'fails closed for an unknown type with no registered renderer', () => {
+			expect( () =>
+				buildDataFormField(
+					{ ...textField, type: 'extension_defined' },
+					createOptions( [] )
+				)
+			).toThrow( 'Field type "extension_defined" is not supported.' );
+		} );
+	} );
+
+	describe( 'descriptions and components', () => {
+		it( 'sanitizes field descriptions into an HTML element', () => {
 			const field = buildDataFormField(
-				{ ...textField, type: 'extension_defined' },
+				{
+					...textField,
+					description:
+						'A <a href="https://example.com">link</a><script>alert("x")</script>.',
+				},
 				createOptions( [] )
 			);
 
-			expect( field.readOnly ).toBe( true );
-			expect( field.Edit ).toBeUndefined();
-			expect( ( field.render as () => null )() ).toBeNull();
-			expect( warnSpy ).toHaveBeenCalledWith(
-				expect.stringContaining(
-					'Field type "extension_defined" is not supported.'
-				),
-				expect.any( Object )
+			const { container, unmount } = renderElement(
+				<div>{ field.description }</div>
+			);
+			expect( container.querySelector( 'a' )?.textContent ).toBe(
+				'link'
+			);
+			expect( container.querySelector( 'script' ) ).toBeNull();
+			unmount();
+		} );
+
+		it( 'strips group descriptions to plain text', () => {
+			const schema: SettingsUISchema = {
+				id: 'test-page',
+				groups: {
+					general: {
+						id: 'general',
+						title: 'General',
+						description: 'Configure <strong>the basics</strong>.',
+						fields: [ textField ],
+					},
+				},
+			};
+			const adapter = createDataFormAdapter( {
+				schema,
+				context,
+				initialValues: {},
+			} );
+
+			const [ group ] = adapter.getForm( {} ).fields as Array< {
+				description?: string;
+			} >;
+			expect( group.description ).toBe( 'Configure the basics.' );
+		} );
+
+		it( 'attaches a registered control as the field edit component', () => {
+			const Registered = () => <div>Registered control</div>;
+			registerSettingsExtension( {
+				scope: { page: 'test-page' },
+				components: { 'test/custom-field': Registered },
+			} );
+
+			const field = buildDataFormField(
+				{ ...textField, component: 'test/custom-field' },
+				createOptions( [] )
+			);
+
+			expect( field.Edit ).toBe( Registered );
+		} );
+
+		it( 'fails closed when a declared component is not registered', () => {
+			jest.spyOn( console, 'warn' ).mockImplementation( () => undefined );
+
+			expect( () =>
+				buildDataFormField(
+					{ ...textField, component: 'test/missing-component' },
+					createOptions( [] )
+				)
+			).toThrow(
+				'Component "test/missing-component" is not registered.'
 			);
 		} );
 	} );
