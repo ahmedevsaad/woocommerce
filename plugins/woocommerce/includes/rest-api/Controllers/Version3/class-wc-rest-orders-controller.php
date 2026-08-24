@@ -139,6 +139,16 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 			}
 		}
 
+		// Coupon removal recalculates order tax from undiscounted amounts before apply_coupon()
+		// validates, so align the staged tax that inclusive-tax spend checks read.
+		$staged_cart_tax = 0.0;
+		foreach ( $staged->get_items() as $staged_item ) {
+			if ( $staged_item instanceof WC_Order_Item_Product ) {
+				$staged_cart_tax += (float) $staged_item->get_subtotal_tax( 'edit' );
+			}
+		}
+		$staged->set_cart_tax( (string) $staged_cart_tax );
+
 		$discounts = new WC_Discounts( $staged );
 
 		$skip_user_usage_limit = function () {

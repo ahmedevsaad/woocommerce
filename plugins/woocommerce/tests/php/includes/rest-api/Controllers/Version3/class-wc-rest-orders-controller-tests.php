@@ -1827,6 +1827,49 @@ class WC_REST_Orders_Controller_Tests extends WC_REST_Unit_Test_Case {
 	}
 
 	/**
+	 * @testdox On inclusive-tax stores a replacement's minimum spend is checked against the undiscounted total.
+	 */
+	public function test_replacement_min_spend_uses_undiscounted_inclusive_tax_total(): void {
+		update_option( 'woocommerce_calc_taxes', 'yes' );
+		update_option( 'woocommerce_prices_include_tax', 'yes' );
+		WC_Tax::_insert_tax_rate(
+			array(
+				'tax_rate_country'  => '',
+				'tax_rate_state'    => '',
+				'tax_rate'          => '25.0000',
+				'tax_rate_name'     => 'tax',
+				'tax_rate_priority' => '1',
+				'tax_rate_order'    => '1',
+				'tax_rate_class'    => '',
+			)
+		);
+		WC_Helper_Coupon::create_coupon(
+			'incl-percent',
+			array(
+				'discount_type' => 'percent',
+				'coupon_amount' => '10',
+			)
+		);
+		WC_Helper_Coupon::create_coupon(
+			'incl-minspend',
+			array(
+				'discount_type'  => 'fixed_cart',
+				'coupon_amount'  => '5',
+				'minimum_amount' => '100',
+			)
+		);
+
+		$order = $this->create_order_for_coupon_replacement( 'incl-tax-customer@example.com' );
+		$this->assertTrue( $order->apply_coupon( 'incl-percent' ) );
+
+		$response = $this->put_coupon_lines( $order->get_id(), array( 'incl-minspend' ) );
+
+		// The $100 inclusive total meets the minimum; the discounted tax must not shrink it below.
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( 'incl-minspend' ), $this->get_reloaded_coupon_codes( $order->get_id() ) );
+	}
+
+	/**
 	 * @testdox An extension forcing per-user usage validation does not block re-sending an applied coupon.
 	 */
 	public function test_forced_user_usage_limit_validation_does_not_block_resent_codes(): void {
