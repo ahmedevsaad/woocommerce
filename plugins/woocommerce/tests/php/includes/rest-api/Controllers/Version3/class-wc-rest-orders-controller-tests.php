@@ -1821,10 +1821,33 @@ class WC_REST_Orders_Controller_Tests extends WC_REST_Unit_Test_Case {
 
 		$response = $this->put_coupon_lines( $order->get_id(), array( 'echo-limited' ) );
 
-		// Removing a guest's coupon does not release its billing-email usage, so the re-apply
-		// can never succeed; it must fail before the removal is persisted.
 		$this->assertSame( 400, $response->get_status() );
 		$this->assertSame( array( 'echo-limited' ), $this->get_reloaded_coupon_codes( $order->get_id() ), 'The coupon should remain applied when its re-application is rejected' );
+		$this->assertEquals( 90, wc_get_order( $order->get_id() )->get_total() );
+	}
+
+	/**
+	 * @testdox Re-sending an applied coupon that has since expired gets a 400 with the coupon kept.
+	 */
+	public function test_echo_of_expired_applied_coupon_is_rejected_without_changes(): void {
+		$coupon = WC_Helper_Coupon::create_coupon(
+			'echo-expired',
+			array(
+				'discount_type' => 'percent',
+				'coupon_amount' => '10',
+			)
+		);
+
+		$order = $this->create_order_for_coupon_replacement( 'echo-expired-customer@example.com' );
+		$this->assertTrue( $order->apply_coupon( 'echo-expired' ) );
+
+		$coupon->set_date_expires( time() - DAY_IN_SECONDS );
+		$coupon->save();
+
+		$response = $this->put_coupon_lines( $order->get_id(), array( 'echo-expired' ) );
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( array( 'echo-expired' ), $this->get_reloaded_coupon_codes( $order->get_id() ), 'The expired coupon should remain applied when its re-application is rejected' );
 		$this->assertEquals( 90, wc_get_order( $order->get_id() )->get_total() );
 	}
 

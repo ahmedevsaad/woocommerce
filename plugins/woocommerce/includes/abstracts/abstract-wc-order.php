@@ -1484,11 +1484,8 @@ abstract class WC_Abstract_Order extends WC_Abstract_Legacy_Order {
 
 		/**
 		 * Filter whether applying a coupon to an order without coupons adopts manually edited
-		 * line totals as the new pre-discount subtotals.
-		 *
-		 * Return false when a line total differing from its subtotal is not a manual price
-		 * edit, e.g. when it represents a discount recorded by an extension that keeps the
-		 * original price in the subtotal, or totals supplied explicitly through an API.
+		 * line totals as the new pre-discount subtotals. Return false when the difference is
+		 * not a manual edit, e.g. an extension-recorded discount or totals posted via an API.
 		 *
 		 * @since 11.2.0
 		 * @param bool              $sync_edited_totals Whether to sync subtotals with edited totals.

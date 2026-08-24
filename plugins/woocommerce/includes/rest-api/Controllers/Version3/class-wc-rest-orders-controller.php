@@ -72,8 +72,7 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 			$coupon_codes[] = wc_format_coupon_code( wc_clean( $coupon_code ) );
 		}
 
-		// apply_coupon() rejects a code that is already applied, so a duplicated code would
-		// fail only after its first copy was applied and saved.
+		// A duplicated code would only fail after its first copy was applied and saved.
 		if ( count( array_unique( array_map( 'wc_strtolower', $coupon_codes ) ) ) !== count( $coupon_codes ) ) {
 			throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon', esc_html__( 'Coupon codes must be unique.', 'woocommerce' ), 400 );
 		}
@@ -99,11 +98,8 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 
 	/**
 	 * Validate the requested coupon codes against a throwaway copy of the order mirroring the
-	 * state apply_coupon() will validate against, before anything is persisted.
-	 *
-	 * Both remove_coupon() and apply_coupon() save the order immediately, so a coupon rejected
-	 * halfway through the replacement sequence would otherwise leave the order changed despite
-	 * the request failing.
+	 * state apply_coupon() will validate against. Both remove_coupon() and apply_coupon() save
+	 * immediately, so a coupon rejected mid-sequence would otherwise leave the order changed.
 	 *
 	 * @since 11.2.0
 	 * @param WC_Order $order                      Order the coupons will be applied to.
@@ -114,17 +110,14 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 	 */
 	protected function validate_coupons_before_replacement( $order, $coupon_codes, $current_order_coupon_codes ) {
 		try {
-			// Not wc_get_order(): the factory can hand out an OrderCache-shared instance, and
-			// the fabricated subtotals below must never leak beyond this method.
+			// Not wc_get_order(): the fabricated subtotals below must not leak into a factory-cached instance.
 			$staged = new WC_Order( $order->get_id() );
 		} catch ( Exception $e ) {
 			throw new WC_REST_Exception( 'woocommerce_rest_invalid_order', esc_html__( 'Invalid order ID.', 'woocommerce' ), 400 );
 		}
 
-		// When no coupons are applied, apply_coupon() adopts manually edited line totals as the
-		// new subtotals before validating; mirror that (in memory only, never saved) so spend
-		// limits are checked against the same amounts. With coupons applied the subtotals are
-		// not changed by the replacement sequence.
+		// Mirror apply_coupon()'s adoption of manually edited totals (in memory only, never
+		// saved) so spend limits validate against the same amounts.
 
 		/**
 		 * This filter is documented in includes/abstracts/abstract-wc-order.php.
@@ -149,25 +142,25 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 		$discounts = new WC_Discounts( $staged );
 
 		foreach ( $coupon_codes as $coupon_code ) {
-			$already_applied = in_array( wc_strtolower( $coupon_code ), $current_order_coupon_codes, true );
+			$already_applied      = in_array( wc_strtolower( $coupon_code ), $current_order_coupon_codes, true );
+			$coupon               = new WC_Coupon( $coupon_code );
+			$usage_limit_per_user = $coupon->get_usage_limit_per_user();
 
-			$coupon = new WC_Coupon( $coupon_code );
-
-			// Skip check if the coupon is already applied to the order, as this could wrongly throw an error for single-use coupons.
-			if ( ! $already_applied ) {
-				$check_result = $discounts->is_coupon_valid( $coupon );
-				if ( is_wp_error( $check_result ) ) {
-					// Coupon error messages are already escaped and may carry markup from wc_price(); esc_html() would double-encode them.
-					throw new WC_REST_Exception( 'woocommerce_rest_' . esc_html( (string) $check_result->get_error_code() ), wp_kses_post( $check_result->get_error_message() ), 400 );
-				}
+			// remove_coupon() releases usage counts before apply_coupon() re-validates, so a
+			// re-sent code must skip usage limits: zeroed limits make both usage validators self-skip.
+			if ( $already_applied ) {
+				$coupon->set_usage_limit( 0 );
+				$coupon->set_usage_limit_per_user( 0 );
 			}
 
-			// is_coupon_valid() skips the per-user usage limit for guest customers, while
-			// apply_coupon() enforces it by billing email; check it here too or the coupon
-			// only fails after earlier coupon removals were already saved. Unlike the check
-			// above, this covers already-applied codes as well: removing a guest's coupon does
-			// not release its billing-email usage, so re-applying it fails the same limit
-			// inside apply_coupon().
+			$check_result = $discounts->is_coupon_valid( $coupon );
+			if ( is_wp_error( $check_result ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- REST error payload, not HTML output; matches apply_coupon()'s unescaped errors and keeps wc_price() markup intact.
+				throw new WC_REST_Exception( 'woocommerce_rest_' . $check_result->get_error_code(), $check_result->get_error_message(), 400 );
+			}
+
+			// is_coupon_valid() skips the guest per-user limit that apply_coupon() enforces by
+			// billing email; removal never releases that usage, so re-sent codes are checked too.
 
 			/**
 			 * Resolved through WC_Data_Store's magic __call proxy.
@@ -175,10 +168,11 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 			 * @var WC_Coupon_Data_Store_CPT $data_store
 			 */
 			$data_store = $coupon->get_data_store();
-			if ( 0 === $staged->get_customer_id() && 0 < $coupon->get_usage_limit_per_user() && $data_store ) {
+			if ( 0 === $staged->get_customer_id() && 0 < $usage_limit_per_user && $data_store ) {
 				$usage_count = $data_store->get_usage_by_email( $coupon, $staged->get_billing_email() );
-				if ( $usage_count >= $coupon->get_usage_limit_per_user() ) {
-					throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon', wp_kses_post( $coupon->get_coupon_error( 106 ) ), 400 );
+				if ( $usage_count >= $usage_limit_per_user ) {
+					// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- REST error payload, not HTML output; matches apply_coupon()'s unescaped errors.
+					throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon', $coupon->get_coupon_error( 106 ), 400 );
 				}
 			}
 		}
@@ -369,12 +363,9 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 				}
 			}
 
-			// Posted line totals are explicit request input rather than manual edits of a
-			// stored order, so adopting them as new subtotals would double-discount orders
-			// sent with pre-discounted totals and their coupon codes. That applies on create
-			// and whenever the request posts line_items; only a request without line_items
-			// operates on stored, admin-edited totals. A unique callback rather than
-			// '__return_false': WordPress keys string callbacks by name, so removing that
+			// Posted line totals are request input, not admin edits: syncing them into subtotals
+			// would double-discount replayed orders. Per-request gate: posted line_items skip the
+			// sync for all items (pre-11.2 behavior). Unique callback, as removing '__return_false'
 			// would also unhook a third party's identical opt-out.
 			$posted_line_totals = $creating || isset( $request['line_items'] );
 			$disable_sync       = function () {
