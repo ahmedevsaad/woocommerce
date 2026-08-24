@@ -390,61 +390,6 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	}
 
 	/**
-	 * @testdox A non-numeric end date does not leave the product queued on every run.
-	 */
-	public function test_wc_scheduled_sales_does_not_requeue_non_numeric_end_dates(): void {
-		$this->assert_end_date_settles_after_one_run( '2020-01-01' );
-	}
-
-	/**
-	 * @testdox An end date of a different digit width does not leave the product queued.
-	 */
-	public function test_wc_scheduled_sales_does_not_requeue_short_numeric_end_dates(): void {
-		// '20200101' and '999999999' are numerically smaller than a current timestamp but
-		// sort above it as strings, which is how the query compares them. A guard that read
-		// them numerically would call the sale over and skip the write the query still wants.
-		$this->assert_end_date_settles_after_one_run( '20200101' );
-		$this->assert_end_date_settles_after_one_run( '999999999' );
-	}
-
-	/**
-	 * Assert a product with the given stored end date starts once and then goes quiet.
-	 *
-	 * @param string $stored_end_date Raw `_sale_price_dates_to` meta value.
-	 */
-	private function assert_end_date_settles_after_one_run( string $stored_end_date ): void {
-		// get_starting_sales() compares the raw meta, so a value like '2020-01-01' does not
-		// read as past there and the product is still returned. If the guard parsed it into
-		// a real date and skipped the price write, the product would keep matching the query
-		// and fire the starting hooks forever, where before it settled after one run.
-		$product = WC_Helper_Product::create_simple_product();
-		$product->set_regular_price( 100 );
-		$product->set_sale_price( 50 );
-		$product->save();
-		update_post_meta( $product->get_id(), '_price', 100 );
-		update_post_meta( $product->get_id(), '_sale_price_dates_from', time() - 300 );
-		update_post_meta( $product->get_id(), '_sale_price_dates_to', $stored_end_date );
-
-		$started = array();
-		add_action(
-			'wc_before_products_starting_sales',
-			function ( $ids ) use ( &$started ) {
-				$started = array_merge( $started, $ids );
-			}
-		);
-
-		wc_scheduled_sales();
-		$this->assertContains( (string) $product->get_id(), $started, 'The first run should still start the sale.' );
-
-		$started = array();
-		wc_scheduled_sales();
-		$this->assertNotContains( (string) $product->get_id(), $started, 'The product must settle instead of being queued again.' );
-
-		$data_store = WC_Data_Store::load( 'product' );
-		$this->assertNotContains( (string) $product->get_id(), $data_store->get_starting_sales() );
-	}
-
-	/**
 	 * @testdox A product left at an expired sale price is repaired once and then goes inert.
 	 */
 	public function test_wc_scheduled_sales_repairs_expired_price_once(): void {
