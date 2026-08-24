@@ -1750,6 +1750,95 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 	}
 
 	/**
+	 * @testdox It accepts local, UTC, and signed-offset datetime grammar with optional seconds.
+	 *
+	 * @dataProvider valid_datetime_grammar_values
+	 *
+	 * @param string $value Candidate datetime value.
+	 * @param string $expected Expected canonical datetime.
+	 */
+	public function test_canonicalize_schema_values_accepts_datetime_grammar_boundaries( string $value, string $expected ): void {
+		$original_timezone = get_option( 'timezone_string' );
+		update_option( 'timezone_string', 'UTC' );
+
+		try {
+			$schema = SettingsUISchema::canonicalize_schema_values(
+				$this->get_native_schema_with_field(
+					array(
+						'id'    => 'acme_start',
+						'label' => 'Starts',
+						'type'  => 'datetime-local',
+						'value' => $value,
+						'save'  => array( 'adapter' => 'custom' ),
+					)
+				),
+				true
+			);
+
+			$this->assertSame( $expected, $schema['groups']['main']['fields'][0]['value'] );
+		} finally {
+			update_option( 'timezone_string', $original_timezone );
+		}
+	}
+
+	/**
+	 * Valid datetime grammar fixtures.
+	 *
+	 * @return array<string, array{string, string}>
+	 */
+	public static function valid_datetime_grammar_values(): array {
+		return array(
+			'local without seconds'           => array( '2026-08-03T12:30', '2026-08-03T12:30:00+00:00' ),
+			'local with seconds'              => array( '2026-08-03T12:30:45', '2026-08-03T12:30:45+00:00' ),
+			'UTC Z without seconds'           => array( '2026-08-03T12:30Z', '2026-08-03T12:30:00+00:00' ),
+			'UTC Z with seconds'              => array( '2026-08-03T12:30:45Z', '2026-08-03T12:30:45+00:00' ),
+			'positive offset without seconds' => array( '2026-08-03T12:30+02:30', '2026-08-03T12:30:00+02:30' ),
+			'negative offset with seconds'    => array( '2026-08-03T12:30:45-04:00', '2026-08-03T12:30:45-04:00' ),
+		);
+	}
+
+	/**
+	 * @testdox It rejects invalid dates and malformed datetime offsets.
+	 *
+	 * @dataProvider invalid_datetime_grammar_values
+	 *
+	 * @param string $value Candidate datetime value.
+	 */
+	public function test_canonicalize_schema_values_rejects_invalid_datetime_grammar( string $value ): void {
+		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( 'datetime value is malformed' );
+
+		SettingsUISchema::canonicalize_schema_values(
+			$this->get_native_schema_with_field(
+				array(
+					'id'    => 'acme_start',
+					'label' => 'Starts',
+					'type'  => 'datetime-local',
+					'value' => $value,
+					'save'  => array( 'adapter' => 'custom' ),
+				)
+			),
+			true
+		);
+	}
+
+	/**
+	 * Invalid datetime grammar fixtures.
+	 *
+	 * @return array<string, array{string}>
+	 */
+	public static function invalid_datetime_grammar_values(): array {
+		return array(
+			'invalid local date'     => array( '2026-02-30T12:00' ),
+			'invalid qualified date' => array( '2026-02-30T12:00Z' ),
+			'short offset hour'      => array( '2026-08-03T12:30+2:00' ),
+			'short offset minute'    => array( '2026-08-03T12:30+02:0' ),
+			'compact offset'         => array( '2026-08-03T12:30+0200' ),
+			'offset without minutes' => array( '2026-08-03T12:30+02' ),
+		);
+	}
+
+	/**
 	 * @testdox It leaves fully canonical native typed values unchanged without a compatibility notice.
 	 */
 	public function test_canonicalize_schema_values_leaves_canonical_native_values_unchanged(): void {

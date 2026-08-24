@@ -89,6 +89,25 @@ class SettingsUISchema {
 	private const DECIMAL_PATTERN = '/^(?<sign>[+-]?)(?:(?<whole>\d+)(?:\.(?<fraction>\d*))?|\.(?<bare_fraction>\d+))(?:[eE](?<exponent>[+-]?\d+))?$/';
 
 	/**
+	 * Store-local datetime grammar with a four-digit year, two-digit date and
+	 * time components, and optional seconds. Calendar validity is checked after
+	 * the pattern matches.
+	 *
+	 * @var string
+	 */
+	private const LOCAL_DATETIME_PATTERN = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/';
+
+	/**
+	 * Timezone-qualified datetime grammar. It uses the local datetime components
+	 * and requires either UTC "Z" or a signed two-digit hour and minute offset.
+	 * Malformed offsets do not match, and calendar validity is checked after the
+	 * pattern matches.
+	 *
+	 * @var string
+	 */
+	private const QUALIFIED_DATETIME_PATTERN = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/';
+
+	/**
 	 * Build a schema from a legacy WC settings array.
 	 *
 	 * @since 10.9.0
@@ -997,10 +1016,10 @@ class SettingsUISchema {
 		}
 
 		$value = trim( $value );
-		if ( preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/', $value ) ) {
+		if ( preg_match( self::LOCAL_DATETIME_PATTERN, $value ) ) {
 			$format   = 16 === strlen( $value ) ? '!Y-m-d\TH:i' : '!Y-m-d\TH:i:s';
 			$datetime = \DateTimeImmutable::createFromFormat( $format, $value, wp_timezone() );
-		} elseif ( preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/', $value ) ) {
+		} elseif ( preg_match( self::QUALIFIED_DATETIME_PATTERN, $value ) ) {
 			$format   = preg_match( '/T\d{2}:\d{2}:/', $value ) ? '!Y-m-d\TH:i:sP' : '!Y-m-d\TH:iP';
 			$datetime = \DateTimeImmutable::createFromFormat( $format, $value );
 		} else {
