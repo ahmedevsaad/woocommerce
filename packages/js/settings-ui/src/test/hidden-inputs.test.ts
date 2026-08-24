@@ -112,6 +112,18 @@ describe( 'getHiddenInputs', () => {
 			message:
 				'Form-post field name "settings[group][quantity]" is not supported.',
 		},
+		{
+			label: 'list initialValue for a scalar field',
+			field: formPostField( {
+				save: {
+					adapter: 'form_post',
+					name: 'quantity',
+					initialValue: [ '1', '2' ],
+				},
+			} ),
+			message:
+				'Field "quantity" has a list initialValue but is not an array field.',
+		},
 	] )(
 		'handles an unsupported $label gracefully by default',
 		( { field, message } ) => {
@@ -147,6 +159,18 @@ describe( 'getHiddenInputs', () => {
 			} ),
 			message:
 				'Form-post field name "settings[group][quantity]" is not supported.',
+		},
+		{
+			label: 'list initialValue for a scalar field',
+			field: formPostField( {
+				save: {
+					adapter: 'form_post',
+					name: 'quantity',
+					initialValue: [ '1', '2' ],
+				},
+			} ),
+			message:
+				'Field "quantity" has a list initialValue but is not an array field.',
 		},
 	] )(
 		'throws for an unsupported $label in strict mode',

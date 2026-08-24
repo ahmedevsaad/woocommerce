@@ -1106,6 +1106,8 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 			'decimal number'       => array( '1.25', 'number', 1.25 ),
 			'equivalent decimal'   => array( '01.2500e0', 'number', 1.25 ),
 			'exponent number'      => array( '1e3', 'number', 1000 ),
+			'padded exponent'      => array( '1e+0000007', 'integer', 10000000 ),
+			'negative zero exp'    => array( '1e-0000000', 'integer', 1 ),
 			'safe integer maximum' => array( '9007199254740991', 'integer', 9007199254740991 ),
 			'safe integer minimum' => array( '-9007199254740991', 'integer', -9007199254740991 ),
 		);
@@ -2036,6 +2038,68 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 	}
 
 	/**
+	 * @testdox It rejects list initial values for scalar fields before form serialization.
+	 */
+	public function test_assert_valid_schema_rejects_list_initial_value_for_scalar_field(): void {
+		$schema                        = self::get_valid_schema_for_validation();
+		$field                         = &$schema['groups']['main']['fields'][0];
+		$field['type']                 = 'number';
+		$field['value']                = 2;
+		$field['save']['initialValue'] = array( '01', '02' );
+
+		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( 'save.initialValue cannot be replayed safely through classic form-post semantics' );
+		SettingsUISchema::assert_valid_schema( $schema );
+	}
+
+	/**
+	 * @testdox It accepts the case-insensitive any keyword for number steps.
+	 */
+	public function test_assert_valid_schema_accepts_case_insensitive_any_number_step(): void {
+		$schema                    = self::get_valid_schema_for_validation();
+		$field                     = &$schema['groups']['main']['fields'][0];
+		$field['type']             = 'number';
+		$field['value']            = 2;
+		$field['customAttributes'] = array( 'step' => 'AnY' );
+
+		SettingsUISchema::assert_valid_schema( $schema );
+		$this->addToAssertionCount( 1 );
+	}
+
+	/**
+	 * @testdox It rejects non-positive number steps.
+	 *
+	 * @dataProvider invalid_number_steps
+	 *
+	 * @param int|float|string $step Invalid number step.
+	 */
+	public function test_assert_valid_schema_rejects_invalid_number_steps( $step ): void {
+		$schema                    = self::get_valid_schema_for_validation();
+		$field                     = &$schema['groups']['main']['fields'][0];
+		$field['type']             = 'number';
+		$field['value']            = 2;
+		$field['customAttributes'] = array( 'step' => $step );
+
+		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( 'custom attribute "step" must be a positive finite number or "any"' );
+		SettingsUISchema::assert_valid_schema( $schema );
+	}
+
+	/**
+	 * Invalid number step fixtures.
+	 *
+	 * @return array<string, array{int|float|string}>
+	 */
+	public static function invalid_number_steps(): array {
+		return array(
+			'integer zero'    => array( 0 ),
+			'decimal zero'    => array( 0.0 ),
+			'negative number' => array( -0.5 ),
+			'zero string'     => array( '0' ),
+		);
+	}
+
+	/**
 	 * @testdox It rejects integer steps that cannot preserve integer values.
 	 *
 	 * @dataProvider invalid_integer_steps
@@ -2087,10 +2151,11 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 				'type'  => 'checkbox',
 			),
 			array(
-				'id'      => 'acme_methods',
-				'title'   => 'Methods',
-				'type'    => 'multiselect',
-				'options' => array(
+				'id'         => 'acme_methods',
+				'field_name' => 'acme_settings[methods][]',
+				'title'      => 'Methods',
+				'type'       => 'multiselect',
+				'options'    => array(
 					'card' => 'Card',
 					'link' => 'Link',
 				),
@@ -2101,17 +2166,17 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 				'type'  => 'datetime-local',
 			),
 		);
-		$option_names      = array( 'acme_settings', 'acme_enabled', 'acme_methods', 'acme_start' );
+		$option_names      = array( 'acme_settings', 'acme_enabled', 'acme_start' );
 
 		update_option(
 			'acme_settings',
 			array(
 				'quantity' => '02',
+				'methods'  => array( 'card' ),
 				'other'    => 'keep',
 			)
 		);
 		update_option( 'acme_enabled', 'yes' );
-		update_option( 'acme_methods', array( 'card' ) );
 		update_option( 'acme_start', '2026-08-03T12:30' );
 		update_option( 'timezone_string', 'America/New_York' );
 
@@ -2140,9 +2205,11 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 
 			$this->assertSame(
 				array(
-					'acme_settings' => array( 'quantity' => '3' ),
+					'acme_settings' => array(
+						'quantity' => '3',
+						'methods'  => array( 'card', 'link' ),
+					),
 					'acme_enabled'  => 'no',
-					'acme_methods'  => array( 'card', 'link' ),
 					'acme_start'    => '2026-08-03T13:45:00',
 				),
 				$post
@@ -2154,15 +2221,14 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 			$this->assertSame(
 				array(
 					'quantity' => '3',
+					'methods'  => array( 'card', 'link' ),
 					'other'    => 'keep',
 				),
 				get_option( 'acme_settings' )
 			);
 			$this->assertSame( 'no', get_option( 'acme_enabled' ) );
-			$this->assertSame( array( 'card', 'link' ), get_option( 'acme_methods' ) );
 			$this->assertSame( '2026-08-03T13:45:00', get_option( 'acme_start' ) );
 			$this->assertSame( maybe_serialize( get_option( 'acme_settings' ) ), $this->get_raw_option_value( 'acme_settings' ) );
-			$this->assertSame( maybe_serialize( get_option( 'acme_methods' ) ), $this->get_raw_option_value( 'acme_methods' ) );
 		} finally {
 			remove_filter( 'woocommerce_admin_settings_sanitize_option', $listener, 10 );
 			update_option( 'timezone_string', $original_timezone );
@@ -2684,12 +2750,17 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 					continue;
 				}
 
-				$name = $field['save']['name'] ?? $field['id'];
-				if ( preg_match( '/^([^\[\]]+)\[([^\[\]]+)\]$/', $name, $matches ) ) {
-					$post[ $matches[1] ][ $matches[2] ] = $form_value;
-				} else {
-					$post[ $name ] = $form_value;
+				$name      = $field['save']['name'] ?? $field['id'];
+				$base_name = '[]' === substr( $name, -2 ) ? substr( $name, 0, -2 ) : $name;
+				$open      = strpos( $base_name, '[' );
+				if ( false === $open ) {
+					$post[ $base_name ] = $form_value;
+					continue;
 				}
+
+				$parent                     = substr( $base_name, 0, $open );
+				$member                     = substr( $base_name, $open + 1, -1 );
+				$post[ $parent ][ $member ] = $form_value;
 			}
 		}
 

@@ -754,7 +754,7 @@ class SettingsUISchema {
 		$negative = '-' === $matches[1];
 		$scale    = strlen( $fraction );
 
-		if ( strlen( ltrim( $exponent, '+-' ) ) > 6 ) {
+		if ( strlen( ltrim( $exponent, '+-0' ) ) > 6 ) {
 			if ( '0' === $digits ) {
 				return '0';
 			}
@@ -1093,6 +1093,10 @@ class SettingsUISchema {
 	 */
 	private static function is_form_value_for_field( $value, array $field ): bool {
 		if ( ! self::is_form_value( $value ) ) {
+			return false;
+		}
+
+		if ( 'array' !== ( $field['type'] ?? null ) && ! is_string( $value ) ) {
 			return false;
 		}
 
@@ -1963,12 +1967,17 @@ class SettingsUISchema {
 					continue;
 				}
 
-				$allow_any = 'step' === $attribute;
-				$valid     = $allow_any
-					? self::is_finite_number( $value, false ) || 'any' === $value
+				$allow_any        = 'step' === $attribute;
+				$is_any           = $allow_any && is_string( $value ) && 0 === strcasecmp( $value, 'any' );
+				$is_integer_field = 'integer' === $field['type'];
+				$valid            = $allow_any
+					? $is_any || ( self::is_finite_number( $value, false ) && ( $is_integer_field || 0 < (float) $value ) )
 					: self::is_canonical_number( $value );
 				if ( ! $valid ) {
-					throw self::invalid_schema( sprintf( 'Field "%s" custom attribute "%s" must be a finite number.', $field['id'], $attribute ) );
+					$message = $allow_any
+						? sprintf( 'Field "%s" custom attribute "step" must be a positive finite number or "any".', $field['id'] )
+						: sprintf( 'Field "%s" custom attribute "%s" must be a finite number.', $field['id'], $attribute );
+					throw self::invalid_schema( $message );
 				}
 
 				if ( 'integer' === $field['type'] && 'step' === $attribute ) {

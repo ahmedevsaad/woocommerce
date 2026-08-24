@@ -119,6 +119,19 @@ export const getHiddenInputs = (
 	if (
 		field.save &&
 		Object.prototype.hasOwnProperty.call( field.save, 'initialValue' ) &&
+		Array.isArray( field.save.initialValue ) &&
+		field.type !== 'array'
+	) {
+		return handleUnsupportedField(
+			`Field "${ field.id }" has a list initialValue but is not an array field.`,
+			field,
+			strict
+		);
+	}
+
+	if (
+		field.save &&
+		Object.prototype.hasOwnProperty.call( field.save, 'initialValue' ) &&
 		typeof initialCanonicalValue !== 'undefined' &&
 		areSettingsValuesEqual( value, initialCanonicalValue )
 	) {
