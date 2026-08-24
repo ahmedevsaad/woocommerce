@@ -78,11 +78,15 @@ class SettingsUISchema {
 	private const JAVASCRIPT_SAFE_INTEGER = '9007199254740991';
 
 	/**
-	 * HTML decimal-number grammar with captures for exact normalization.
+	 * HTML decimal-number grammar with named captures for exact normalization.
+	 *
+	 * Captures the optional sign, whole-number digits, fractional digits after a
+	 * whole number, fractional digits without a whole number, and the optional
+	 * signed exponent.
 	 *
 	 * @var string
 	 */
-	private const DECIMAL_PATTERN = '/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/';
+	private const DECIMAL_PATTERN = '/^(?<sign>[+-]?)(?:(?<whole>\d+)(?:\.(?<fraction>\d*))?|\.(?<bare_fraction>\d+))(?:[eE](?<exponent>[+-]?\d+))?$/';
 
 	/**
 	 * Build a schema from a legacy WC settings array.
@@ -746,12 +750,12 @@ class SettingsUISchema {
 			return null;
 		}
 
-		$whole    = $matches[2] ?? '';
-		$fraction = '' !== ( $matches[3] ?? '' ) ? $matches[3] : ( $matches[4] ?? '' );
+		$whole    = $matches['whole'] ?? '';
+		$fraction = '' !== ( $matches['fraction'] ?? '' ) ? $matches['fraction'] : ( $matches['bare_fraction'] ?? '' );
 		$digits   = ltrim( $whole . $fraction, '0' );
 		$digits   = '' === $digits ? '0' : $digits;
-		$exponent = $matches[5] ?? '0';
-		$negative = '-' === $matches[1];
+		$exponent = $matches['exponent'] ?? '0';
+		$negative = '-' === $matches['sign'];
 		$scale    = strlen( $fraction );
 
 		if ( strlen( ltrim( $exponent, '+-0' ) ) > 6 ) {
@@ -843,8 +847,8 @@ class SettingsUISchema {
 	 * @return bool
 	 */
 	private static function decimal_string_is_zero( string $value ): bool {
-		$mantissa = preg_replace( '/[eE].*$/', '', $value );
-		return '' === trim( (string) $mantissa, '+-0.' );
+		$mantissa = substr( $value, 0, strcspn( $value, 'eE' ) );
+		return '' === trim( $mantissa, '+-0.' );
 	}
 
 	/**
@@ -872,14 +876,14 @@ class SettingsUISchema {
 			return null;
 		}
 
-		$whole    = $matches[2] ?? '';
-		$fraction = '' !== ( $matches[3] ?? '' ) ? $matches[3] : ( $matches[4] ?? '' );
+		$whole    = $matches['whole'] ?? '';
+		$fraction = '' !== ( $matches['fraction'] ?? '' ) ? $matches['fraction'] : ( $matches['bare_fraction'] ?? '' );
 		$digits   = ltrim( $whole . $fraction, '0' );
 		if ( '' === $digits ) {
 			return array( '0', 0 );
 		}
 
-		$exponent        = $matches[5] ?? '0';
+		$exponent        = $matches['exponent'] ?? '0';
 		$exponent_digits = ltrim( $exponent, '+-0' );
 		if ( 6 < strlen( $exponent_digits ) ) {
 			return null;
@@ -888,7 +892,7 @@ class SettingsUISchema {
 		$power          = (int) $exponent - strlen( $fraction );
 		$trimmed_digits = rtrim( $digits, '0' );
 		$power         += strlen( $digits ) - strlen( $trimmed_digits );
-		$signed_digits  = '-' === $matches[1] ? '-' . $trimmed_digits : $trimmed_digits;
+		$signed_digits  = '-' === $matches['sign'] ? '-' . $trimmed_digits : $trimmed_digits;
 
 		return array( $signed_digits, $power );
 	}
