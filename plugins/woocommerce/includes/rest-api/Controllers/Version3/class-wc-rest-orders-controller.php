@@ -119,12 +119,17 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 		// Mirror apply_coupon()'s adoption of manually edited totals (in memory only, never
 		// saved) so spend limits validate against the same amounts.
 
-		/**
-		 * This filter is documented in includes/abstracts/abstract-wc-order.php.
-		 *
-		 * @since 11.2.0
-		 */
-		if ( empty( $staged->get_items( 'coupon' ) ) && apply_filters( 'woocommerce_order_apply_coupon_sync_edited_totals', true, $staged ) ) {
+		$sync_edited_totals = false;
+		if ( empty( $staged->get_items( 'coupon' ) ) ) {
+			/**
+			 * This filter is documented in includes/abstracts/abstract-wc-order.php.
+			 *
+			 * @since 11.2.0
+			 */
+			$sync_edited_totals = apply_filters( 'woocommerce_order_apply_coupon_sync_edited_totals', true, $staged );
+		}
+
+		if ( $sync_edited_totals ) {
 			foreach ( $staged->get_items() as $staged_item ) {
 				if ( ! $staged_item instanceof WC_Order_Item_Product ) {
 					continue;
