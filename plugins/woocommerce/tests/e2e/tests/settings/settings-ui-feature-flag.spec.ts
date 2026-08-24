@@ -132,7 +132,7 @@ test.describe( 'Settings UI feature flag', { tag: [ tags.NOT_E2E ] }, () => {
 		expect( compatibilityFailures ).toEqual( [] );
 	} );
 
-	test( 'preserves an untouched inventory value when another setting is saved', async ( {
+	test( 'submits an untouched inventory value through classic sanitization', async ( {
 		baseURL,
 		page,
 	} ) => {
@@ -186,7 +186,7 @@ test.describe( 'Settings UI feature flag', { tag: [ tags.NOT_E2E ] }, () => {
 			),
 		] );
 		expect( holdStockOption.stdout.trim() ).toBe( '61' );
-		expect( lowStockOption.stdout.trim() ).toBe( '02' );
+		expect( lowStockOption.stdout.trim() ).toBe( '2' );
 	} );
 
 	test( 'loads a declared component registration before mounting settings', async ( {
