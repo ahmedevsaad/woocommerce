@@ -1827,6 +1827,35 @@ class WC_REST_Orders_Controller_Tests extends WC_REST_Unit_Test_Case {
 	}
 
 	/**
+	 * @testdox An extension forcing per-user usage validation does not block re-sending an applied coupon.
+	 */
+	public function test_forced_user_usage_limit_validation_does_not_block_resent_codes(): void {
+		WC_Helper_Coupon::create_coupon(
+			'echo-forced',
+			array(
+				'discount_type'        => 'percent',
+				'coupon_amount'        => '10',
+				'usage_limit_per_user' => '5',
+			)
+		);
+
+		$order = $this->create_order_for_coupon_replacement( 'echo-forced-customer@example.com' );
+		$order->set_customer_id( self::$administrator_id );
+		$order->save();
+		$this->assertTrue( $order->apply_coupon( 'echo-forced' ) );
+
+		add_filter( 'woocommerce_coupon_validate_user_usage_limit', '__return_true' );
+		try {
+			$response = $this->put_coupon_lines( $order->get_id(), array( 'echo-forced' ) );
+		} finally {
+			remove_filter( 'woocommerce_coupon_validate_user_usage_limit', '__return_true' );
+		}
+
+		$this->assertSame( 200, $response->get_status(), 'A forced per-user validation must not reject a re-sent code' );
+		$this->assertSame( array( 'echo-forced' ), $this->get_reloaded_coupon_codes( $order->get_id() ) );
+	}
+
+	/**
 	 * @testdox Re-sending an applied coupon that has since expired gets a 400 with the coupon kept.
 	 */
 	public function test_echo_of_expired_applied_coupon_is_rejected_without_changes(): void {

@@ -141,19 +141,29 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 
 		$discounts = new WC_Discounts( $staged );
 
+		$skip_user_usage_limit = function () {
+			return false;
+		};
+
 		foreach ( $coupon_codes as $coupon_code ) {
 			$already_applied      = in_array( wc_strtolower( $coupon_code ), $current_order_coupon_codes, true );
 			$coupon               = new WC_Coupon( $coupon_code );
 			$usage_limit_per_user = $coupon->get_usage_limit_per_user();
 
 			// remove_coupon() releases usage counts before apply_coupon() re-validates, so a
-			// re-sent code must skip usage limits: zeroed limits make both usage validators self-skip.
+			// re-sent code must skip usage limits. The per-user validator's filter is forced off,
+			// as zeroing that limit would let a callback returning true reduce it to "usage >= 0".
 			if ( $already_applied ) {
 				$coupon->set_usage_limit( 0 );
-				$coupon->set_usage_limit_per_user( 0 );
+				add_filter( 'woocommerce_coupon_validate_user_usage_limit', $skip_user_usage_limit, PHP_INT_MAX );
 			}
 
 			$check_result = $discounts->is_coupon_valid( $coupon );
+
+			if ( $already_applied ) {
+				remove_filter( 'woocommerce_coupon_validate_user_usage_limit', $skip_user_usage_limit, PHP_INT_MAX );
+			}
+
 			if ( is_wp_error( $check_result ) ) {
 				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- REST error payload, not HTML output; matches apply_coupon()'s unescaped errors and keeps wc_price() markup intact.
 				throw new WC_REST_Exception( 'woocommerce_rest_' . $check_result->get_error_code(), $check_result->get_error_message(), 400 );
