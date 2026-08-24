@@ -77,7 +77,10 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 			throw new WC_REST_Exception( 'woocommerce_rest_invalid_coupon', esc_html__( 'Coupon codes must be unique.', 'woocommerce' ), 400 );
 		}
 
-		$this->validate_coupons_before_replacement( $order, $coupon_codes, $current_order_coupon_codes );
+		// An empty list is the "clear all coupons" call; nothing to validate.
+		if ( ! empty( $coupon_codes ) ) {
+			$this->validate_coupons_before_replacement( $order, $coupon_codes, $current_order_coupon_codes );
+		}
 
 		// Remove all coupons first to ensure calculation is correct.
 		foreach ( $order->get_items( 'coupon' ) as $existing_coupon ) {
