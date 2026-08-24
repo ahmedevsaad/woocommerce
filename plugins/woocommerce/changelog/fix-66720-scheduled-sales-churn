@@ -1,0 +1,4 @@
+Significance: patch
+Type: fix
+
+Stop the daily scheduled-sales cron reprocessing every completed scheduled sale as both a starting and an ending sale.

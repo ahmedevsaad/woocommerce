@@ -1438,11 +1438,17 @@ class WC_Product_Data_Store_CPT extends WC_Data_Store_WP implements WC_Object_Da
 	/**
 	 * Returns an array of IDs of products that have sales starting soon.
 	 *
+	 * Products whose sale window has already closed are excluded: starting a sale that
+	 * is already over would only be undone by get_ending_sales() on the same run, and
+	 * the product would qualify again on every subsequent run.
+	 *
 	 * @since 3.0.0
 	 * @return array
 	 */
 	public function get_starting_sales() {
 		global $wpdb;
+
+		$now = time();
 
 		// phpcs:ignore WordPress.VIP.DirectDatabaseQuery.DirectQuery
 		return $wpdb->get_col(
@@ -1455,8 +1461,16 @@ class WC_Product_Data_Store_CPT extends WC_Data_Store_WP implements WC_Object_Da
 					AND postmeta_3.meta_key = '_sale_price'
 					AND postmeta.meta_value > 0
 					AND postmeta.meta_value < %s
-					AND postmeta_2.meta_value != postmeta_3.meta_value",
-				time()
+					AND postmeta_2.meta_value != postmeta_3.meta_value
+					AND NOT EXISTS (
+						SELECT 1 FROM {$wpdb->postmeta} as ended
+						WHERE ended.post_id = postmeta.post_id
+							AND ended.meta_key = '_sale_price_dates_to'
+							AND ended.meta_value > 0
+							AND ended.meta_value < %s
+					)",
+				$now,
+				$now
 			)
 		);
 	}
