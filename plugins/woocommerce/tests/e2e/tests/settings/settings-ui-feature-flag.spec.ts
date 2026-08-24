@@ -178,8 +178,12 @@ test.describe( 'Settings UI feature flag', { tag: [ tags.NOT_E2E ] }, () => {
 		await expect( editedHoldStock ).toHaveValue( '61' );
 
 		const [ holdStockOption, lowStockOption ] = await Promise.all( [
-			wpCLI( 'wp option get woocommerce_hold_stock_minutes' ),
-			wpCLI( 'wp option get woocommerce_notify_low_stock_amount' ),
+			wpCLI(
+				'wp option get woocommerce_hold_stock_minutes --skip-plugins'
+			),
+			wpCLI(
+				'wp option get woocommerce_notify_low_stock_amount --skip-plugins'
+			),
 		] );
 		expect( holdStockOption.stdout.trim() ).toBe( '61' );
 		expect( lowStockOption.stdout.trim() ).toBe( '02' );
