@@ -110,9 +110,18 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 	 */
 	protected function validate_coupons_before_replacement( $order, $coupon_codes, $current_order_coupon_codes ) {
 		try {
-			// Not wc_get_order(): the fabricated subtotals below must not leak into a factory-cached instance.
-			$staged = new WC_Order( $order->get_id() );
+			// Direct instantiation, not wc_get_order(): the fabricated subtotals below must not
+			// leak into a factory-cached instance. The class is still resolved through the
+			// factory so a substituted order class is mirrored here too.
+			$order_id    = $order->get_id();
+			$class_names = WC_Order_Factory::get_class_names_for_order_ids( array( $order_id ) );
+			$classname   = ! empty( $class_names[ $order_id ] ) ? $class_names[ $order_id ] : WC_Order::class;
+			$staged      = new $classname( $order_id );
 		} catch ( Exception $e ) {
+			throw new WC_REST_Exception( 'woocommerce_rest_invalid_order', esc_html__( 'Invalid order ID.', 'woocommerce' ), 400 );
+		}
+
+		if ( ! $staged instanceof WC_Order ) {
 			throw new WC_REST_Exception( 'woocommerce_rest_invalid_order', esc_html__( 'Invalid order ID.', 'woocommerce' ), 400 );
 		}
 
