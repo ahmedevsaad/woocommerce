@@ -488,7 +488,14 @@ class SettingsUISchema {
 				$original_value_changed = array_key_exists( $field['id'], $original_values )
 					&& array_key_exists( 'value', $field )
 					&& $original_values[ $field['id'] ] !== $field['value'];
-				if ( $typed_conversion || ( $original_value_changed && in_array( $field['type'], self::TYPED_VALUE_FIELD_TYPES, true ) ) ) {
+				if (
+					$typed_conversion ||
+					(
+						$original_value_changed &&
+						is_string( $field['type'] ?? null ) &&
+						in_array( $field['type'], self::TYPED_VALUE_FIELD_TYPES, true )
+					)
+				) {
 					$fields_requiring_form_preservation[ $field['id'] ] = true;
 				}
 			}

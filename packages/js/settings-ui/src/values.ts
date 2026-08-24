@@ -14,6 +14,8 @@ const CANONICAL_DATETIME_FORMAT = 'Y-m-d\\TH:i:sP';
 type NormalizedDecimal = [ string, number ];
 
 const normalizeDecimalString = ( value: string ): NormalizedDecimal | null => {
+	// Accept an optional sign, an integer with an optional fraction or a bare
+	// fraction, and an optional signed exponent.
 	const matches = value.match(
 		/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/
 	);
@@ -119,5 +121,10 @@ export const toCanonicalDateTime = ( value: string ): string | null => {
 		return null;
 	}
 
-	return date( CANONICAL_DATETIME_FORMAT, getDate( value ) );
+	const parsed = getDate( value );
+	if ( Number.isNaN( parsed.getTime() ) ) {
+		return null;
+	}
+
+	return date( CANONICAL_DATETIME_FORMAT, parsed );
 };

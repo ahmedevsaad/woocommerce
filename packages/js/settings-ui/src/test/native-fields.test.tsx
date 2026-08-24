@@ -18,7 +18,7 @@ import {
 	isNativeSettingsFieldType,
 	NativeSettingsField,
 } from '../native-fields';
-import { toCanonicalNumberValue } from '../values';
+import { toCanonicalDateTime, toCanonicalNumberValue } from '../values';
 import type {
 	SettingsFieldComponentProps,
 	SettingsUIField,
@@ -659,6 +659,10 @@ describe( 'NativeSettingsField', () => {
 	} );
 
 	describe( 'datetime-local fields', () => {
+		it( 'rejects invalid datetime strings', () => {
+			expect( toCanonicalDateTime( '2026-13-40T25:61' ) ).toBeNull();
+		} );
+
 		it.each( [
 			[ 'date', '2026-08-03', '2026-01-01', '2026-12-31', '1' ],
 			[ 'time', '12:30', '09:00', '17:00', '900' ],

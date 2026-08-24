@@ -1140,6 +1140,34 @@ class SettingsUISchemaTest extends WC_Unit_Test_Case {
 	}
 
 	/**
+	 * @testdox It does not read a missing field type while it canonicalizes option values.
+	 */
+	public function test_canonicalize_schema_values_handles_missing_field_type(): void {
+		$this->setExpectedIncorrectUsage( SettingsUISchema::class . '::canonicalize_schema_values' );
+
+		$schema = SettingsUISchema::canonicalize_schema_values(
+			$this->get_native_schema_with_field(
+				array(
+					'id'      => 'acme_value',
+					'label'   => 'Value',
+					'value'   => 1,
+					'options' => array(
+						array(
+							'label' => 'One',
+							'value' => 1,
+						),
+					),
+				)
+			)
+		);
+
+		$field = $schema['groups']['main']['fields'][0];
+		$this->assertArrayNotHasKey( 'type', $field );
+		$this->assertSame( '1', $field['value'] );
+		$this->assertSame( '1', $field['options'][0]['value'] );
+	}
+
+	/**
 	 * Supported scalar value fixtures.
 	 *
 	 * @return array<string, array{string, mixed, string}>

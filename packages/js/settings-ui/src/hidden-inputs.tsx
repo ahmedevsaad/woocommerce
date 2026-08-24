@@ -24,6 +24,9 @@ const isSupportedFieldName = ( name: string, isArray: boolean ) => {
 	const baseName =
 		isArray && name.endsWith( '[]' ) ? name.slice( 0, -2 ) : name;
 
+	// Accept a flat name or one bracketed segment. Array fields can also use a
+	// trailing []. Keep this in sync with
+	// SettingsUISchema::is_supported_form_post_name().
 	return /^[^\[\]]+(?:\[[^\[\]]+\])?$/.test( baseName );
 };
 
