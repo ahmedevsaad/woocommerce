@@ -175,10 +175,12 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 				add_filter( 'woocommerce_coupon_validate_user_usage_limit', $skip_user_usage_limit, PHP_INT_MAX );
 			}
 
-			$check_result = $discounts->is_coupon_valid( $coupon );
-
-			if ( $already_applied ) {
-				remove_filter( 'woocommerce_coupon_validate_user_usage_limit', $skip_user_usage_limit, PHP_INT_MAX );
+			try {
+				$check_result = $discounts->is_coupon_valid( $coupon );
+			} finally {
+				if ( $already_applied ) {
+					remove_filter( 'woocommerce_coupon_validate_user_usage_limit', $skip_user_usage_limit, PHP_INT_MAX );
+				}
 			}
 
 			if ( is_wp_error( $check_result ) ) {
