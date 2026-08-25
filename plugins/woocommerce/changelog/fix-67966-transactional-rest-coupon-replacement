@@ -1,4 +1,4 @@
 Significance: patch
 Type: fix
 
-Don't persist partial coupon changes when a REST API order update fails coupon validation.
+Validate REST order coupon replacements up front so a rejected coupon no longer discards the order's existing coupons.
