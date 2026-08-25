@@ -425,10 +425,14 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	 * Do not "simplify" these to a far-future calendar date such as '9999-12-31': that parses
 	 * as future, so no guard reads it as ended and the case stops discriminating entirely.
 	 *
-	 * Known limit: a guard doing a byte-wise `strcmp()` mirror of the query agrees with the
-	 * collation on every ASCII value, so no value here catches it. It only diverges on
-	 * collation-ignorable characters such as U+200B, and a fixture carrying an invisible
-	 * control character would be a worse hazard than the shape it guards.
+	 * Known limit: no value here catches a guard doing a byte-wise `strcmp()` mirror of the
+	 * query, and the reason is directional. Churn needs the mirror to read "ended" where the
+	 * query does not, which takes a byte the collation ignores that also sorts below '0'.
+	 * Only C0 control bytes qualify: an invisible character such as U+200B leads with a byte
+	 * above every digit, so it can only make the mirror more permissive, which cannot churn.
+	 * Measured, with the mirror guard and a current timestamp: a U+200B value agrees with the
+	 * query and settles, a 0x01 value diverges and re-queues. Catching that shape would mean
+	 * a fixture carrying a raw control byte, which is a worse hazard than the shape itself.
 	 *
 	 * @return array<string, array{string}>
 	 */
