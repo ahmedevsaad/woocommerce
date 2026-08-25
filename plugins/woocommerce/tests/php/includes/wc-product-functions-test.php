@@ -390,6 +390,43 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	}
 
 	/**
+	 * @testdox A sale the query still returns is started once and then settles.
+	 */
+	public function test_wc_scheduled_sales_settles_a_sale_the_query_still_returns(): void {
+		// A full cycle through wc_scheduled_sales(), not just the query. '2020-01-01' sorts
+		// above the decimal rendering of a timestamp, so the clause treats it as not ended
+		// and the product is returned. The consumer must then write the price, which is what
+		// takes it out of the queue. Anything that decides "ended" differently from the query
+		// and skips that write leaves the product queued and firing the starting hooks on
+		// every run, which is the churn this fix removes.
+		$product = WC_Helper_Product::create_simple_product();
+		$product->set_regular_price( 100 );
+		$product->set_sale_price( 50 );
+		$product->save();
+		update_post_meta( $product->get_id(), '_price', 100 );
+		update_post_meta( $product->get_id(), '_sale_price_dates_from', time() - 300 );
+		update_post_meta( $product->get_id(), '_sale_price_dates_to', '2020-01-01' );
+
+		$started = array();
+		add_action(
+			'wc_before_products_starting_sales',
+			function ( $ids ) use ( &$started ) {
+				$started = array_merge( $started, $ids );
+			}
+		);
+
+		wc_scheduled_sales();
+		$this->assertContains( (string) $product->get_id(), $started, 'The first run should start the sale.' );
+
+		$started = array();
+		wc_scheduled_sales();
+		$this->assertNotContains( (string) $product->get_id(), $started, 'The product must settle instead of being queued again.' );
+
+		$data_store = WC_Data_Store::load( 'product' );
+		$this->assertNotContains( (string) $product->get_id(), $data_store->get_starting_sales() );
+	}
+
+	/**
 	 * @testdox A product left at an expired sale price is repaired once and then goes inert.
 	 */
 	public function test_wc_scheduled_sales_repairs_expired_price_once(): void {
