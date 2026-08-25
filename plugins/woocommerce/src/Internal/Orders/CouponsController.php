@@ -84,8 +84,11 @@ class CouponsController {
 		$order->calculate_taxes( $calculate_tax_args );
 		$order->calculate_totals( false );
 
-		$code   = wc_format_coupon_code( wp_unslash( $coupon ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		$result = $order->apply_coupon( $code );
+		$code = wc_format_coupon_code( wp_unslash( $coupon ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+
+		// In the order editor a line total differing from its subtotal is a manual price edit,
+		// so the discount is calculated from the edited price rather than the original one.
+		$result = $order->apply_coupon_adopting_edited_totals( $code );
 
 		if ( is_wp_error( $result ) ) {
 			throw new Exception( html_entity_decode( wp_strip_all_tags( $result->get_error_message() ) ) );

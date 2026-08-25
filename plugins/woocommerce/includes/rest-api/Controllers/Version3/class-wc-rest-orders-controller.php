@@ -128,34 +128,6 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 			throw new WC_REST_Exception( 'woocommerce_rest_invalid_order', esc_html__( 'Invalid order ID.', 'woocommerce' ), 400 );
 		}
 
-		// Mirror apply_coupon()'s adoption of manually edited totals (in memory only, never
-		// saved) so spend limits validate against the same amounts.
-
-		$sync_edited_totals = false;
-		if ( empty( $staged->get_items( 'coupon' ) ) ) {
-			/**
-			 * This filter is documented in includes/abstracts/abstract-wc-order.php.
-			 *
-			 * @since 11.2.0
-			 */
-			$sync_edited_totals = apply_filters( 'woocommerce_order_apply_coupon_sync_edited_totals', true, $staged );
-		}
-
-		if ( $sync_edited_totals ) {
-			foreach ( $staged->get_items() as $staged_item ) {
-				if ( ! $staged_item instanceof WC_Order_Item_Product ) {
-					continue;
-				}
-
-				if ( (float) $staged_item->get_subtotal( 'edit' ) === (float) $staged_item->get_total( 'edit' ) && (float) $staged_item->get_subtotal_tax( 'edit' ) === (float) $staged_item->get_total_tax( 'edit' ) ) {
-					continue;
-				}
-
-				$staged_item->set_subtotal( $staged_item->get_total( 'edit' ) );
-				$staged_item->set_subtotal_tax( $staged_item->get_total_tax( 'edit' ) );
-			}
-		}
-
 		// Coupon removal recalculates order tax from undiscounted amounts before apply_coupon()
 		// validates, so align the staged tax that inclusive-tax spend checks read.
 		$staged_cart_tax = 0.0;
@@ -404,26 +376,8 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 				}
 			}
 
-			// Posted line totals are request input, not admin edits: syncing them into subtotals
-			// would double-discount replayed orders. Per-request gate: posted line_items skip the
-			// sync for all items (pre-11.2 behavior). Unique callback, as removing '__return_false'
-			// would also unhook a third party's identical opt-out.
-			$posted_line_totals = $creating || isset( $request['line_items'] );
-			$disable_sync       = function () {
-				return false;
-			};
-			if ( $posted_line_totals ) {
-				add_filter( 'woocommerce_order_apply_coupon_sync_edited_totals', $disable_sync );
-			}
-
-			try {
-				// Set coupons.
-				$this->calculate_coupons( $request, $object );
-			} finally {
-				if ( $posted_line_totals ) {
-					remove_filter( 'woocommerce_order_apply_coupon_sync_edited_totals', $disable_sync );
-				}
-			}
+			// Set coupons.
+			$this->calculate_coupons( $request, $object );
 
 			// Set status.
 			if ( ! empty( $request['status'] ) ) {

@@ -1698,29 +1698,29 @@ class WC_REST_Orders_Controller_Tests extends WC_REST_Unit_Test_Case {
 			)
 		);
 		WC_Helper_Coupon::create_coupon(
-			'batch-minspend',
+			'batch-expired',
 			array(
-				'discount_type'  => 'fixed_cart',
-				'coupon_amount'  => '5',
-				'minimum_amount' => '75',
+				'discount_type' => 'fixed_cart',
+				'coupon_amount' => '5',
+				'expiry_date'   => gmdate( 'Y-m-d', time() - 2 * DAY_IN_SECONDS ),
 			)
 		);
 
 		$order = $this->create_order_for_coupon_replacement( 'batch-customer@example.com', 50 );
 
-		$response = $this->put_coupon_lines( $order->get_id(), array( 'batch-percent', 'batch-minspend' ) );
+		$response = $this->put_coupon_lines( $order->get_id(), array( 'batch-percent', 'batch-expired' ) );
 
 		$this->assertSame( 400, $response->get_status() );
 		$this->assertSame( array(), $this->get_reloaded_coupon_codes( $order->get_id() ), 'No coupon from the failed batch should remain applied' );
 		$item = current( wc_get_order( $order->get_id() )->get_items() );
-		$this->assertEquals( 100, $item->get_subtotal(), 'The failed batch should not sync the edited total into the subtotal' );
+		$this->assertEquals( 100, $item->get_subtotal(), 'The failed batch should not change the subtotal' );
 		$this->assertEquals( 50, $item->get_total(), 'The failed batch should not change the edited line total' );
 	}
 
 	/**
-	 * @testdox Spend limits are validated against manually edited line totals, matching what applying would use.
+	 * @testdox Spend limits are validated against the stored subtotals, matching what applying would use.
 	 */
-	public function test_min_spend_validated_against_manually_edited_total(): void {
+	public function test_min_spend_validated_against_stored_subtotal(): void {
 		WC_Helper_Coupon::create_coupon(
 			'edited-minspend',
 			array(
@@ -1734,12 +1734,13 @@ class WC_REST_Orders_Controller_Tests extends WC_REST_Unit_Test_Case {
 
 		$response = $this->put_coupon_lines( $order->get_id(), array( 'edited-minspend' ) );
 
-		$this->assertSame( 400, $response->get_status(), 'The minimum spend should be checked against the edited price the discount would use' );
-		$this->assertSame( array(), $this->get_reloaded_coupon_codes( $order->get_id() ) );
+		$this->assertSame( 200, $response->get_status(), 'The minimum spend should be checked against the stored subtotal the discount is calculated from' );
+		$this->assertSame( array( 'edited-minspend' ), $this->get_reloaded_coupon_codes( $order->get_id() ) );
+		$this->assertEquals( 95, wc_get_order( $order->get_id() )->get_total(), 'The discount should be taken off the stored subtotal' );
 	}
 
 	/**
-	 * @testdox A valid coupon still applies to an order with manually edited line totals.
+	 * @testdox A coupon applied via REST calculates the discount from the stored subtotal, not a manually edited total.
 	 */
 	public function test_valid_coupon_applies_to_manually_edited_order(): void {
 		WC_Helper_Coupon::create_coupon(
@@ -1756,7 +1757,7 @@ class WC_REST_Orders_Controller_Tests extends WC_REST_Unit_Test_Case {
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( array( 'edited-percent' ), $this->get_reloaded_coupon_codes( $order->get_id() ) );
-		$this->assertEquals( 45, wc_get_order( $order->get_id() )->get_total(), 'The discount should be taken off the edited price' );
+		$this->assertEquals( 90, wc_get_order( $order->get_id() )->get_total(), 'The discount should be taken off the stored subtotal, not the edited total' );
 	}
 
 	/**
