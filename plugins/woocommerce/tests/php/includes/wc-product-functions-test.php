@@ -404,18 +404,30 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	 *   DateTime::createFromFormat( 'Ymd', $v )        |   -    | yes |     -     |     -
 	 *   strtotime( $v )                                |  yes   | yes |     -     |    yes
 	 *   strcmp( $v, (string) time() ) < 0              |   -    |  -  |     -     |    yes
-	 *   $v > 0 && strcmp( $v, (string) time() ) < 0    |   -    |  -  |     -     |    yes
+	 *   $v > 0 && strcmp( ... )        (uncast)       |   -    |  -  |     -     |    yes
+	 *   (float) $v > 0 && strcmp( ... ) (cast)        |   -    |  -  |     -     |     -
 	 *
 	 * The first row is not hypothetical: this branch shipped that exact expression during
 	 * development and had to repair it. With only '2020-01-01' present the suite stayed fully
 	 * green against it.
 	 *
-	 * The last two rows are the byte-wise mirrors of the query itself, and '0000-00-00' is the
-	 * only value that catches them. It diverges through the `> 0` term rather than the date
-	 * comparison: MariaDB coerces it to 0 so the query reads "not ended", while PHP 8 compares
-	 * a non-numeric string against 0 as a string, making `$v > 0` true, and `strcmp` then puts
-	 * it below any timestamp. It is also the one value here that never expires, since it sorts
-	 * below every timestamp for the same reason.
+	 * The last three rows are byte-wise mirrors of the query itself. '0000-00-00' catches the
+	 * first two, diverging through the `> 0` term rather than the date comparison: MariaDB
+	 * coerces it to 0 so the query reads "not ended", while PHP 8 compares a non-numeric string
+	 * against 0 as a string, making `$v > 0` true, and `strcmp` then puts it below any
+	 * timestamp. It is also the one value here that never expires, since sorting below every
+	 * timestamp is the same property that makes it work.
+	 *
+	 * The cast mirror on the last row is a real gap and no fixture here closes it. `(float)`
+	 * or `(int)` on '0000-00-00' is 0, so that guard short-circuits before comparing and cannot
+	 * disagree with the query. Catching it needs a value the collation ignores that also sorts
+	 * below the timestamp's leading digit, which in practice means a C0 control byte: measured,
+	 * `"1\x019999999999"` is read as not-ended by the query (MariaDB coerces it to 1 and
+	 * normalizes the ignorable byte away, so it sorts above `time()`) while the cast mirror
+	 * reads it as ended and skips the write, re-queueing forever. No printable value closes
+	 * this: U+200B leads with 0xE2 so its `strcmp` goes the permissive way, and "\n", "\t",
+	 * "\r" are not ignorable in utf8mb4_unicode_520_ci, so the query excludes them itself. A
+	 * fixture carrying a raw control byte would be a worse hazard than the shape it guards.
 	 *
 	 * Longevity of the rest, verified against the engine: '2020-01-01' stops sorting above
 	 * `time()` at Unix 2020000000 (2034-01-04 15:06:40 UTC), when the separator loses to the
@@ -424,8 +436,8 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	 *
 	 * Do not "simplify" these to a far-future calendar date such as '9999-12-31': that parses
 	 * as future, so no guard reads it as ended and the case stops discriminating entirely.
-	 * '20200101' is the sole catcher of a strict `Ymd` parser and '0000-00-00' of both mirror
-	 * shapes, so neither can be dropped without losing a row outright.
+	 * '20200101' is the sole catcher of a strict `Ymd` parser and '0000-00-00' of the uncast
+	 * mirror rows, so neither can be dropped without losing a row outright.
 	 *
 	 * @return array<string, array{string}>
 	 */
