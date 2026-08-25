@@ -128,6 +128,12 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 			throw new WC_REST_Exception( 'woocommerce_rest_invalid_order', esc_html__( 'Invalid order ID.', 'woocommerce' ), 400 );
 		}
 
+		// The real path removes all coupons before applying, so validation filter callbacks
+		// reading the order must not see the pre-removal coupon items (in memory only).
+		foreach ( array_keys( $staged->get_items( 'coupon' ) ) as $staged_coupon_item_id ) {
+			$staged->remove_item( $staged_coupon_item_id );
+		}
+
 		// Coupon removal recalculates order tax from undiscounted amounts before apply_coupon()
 		// validates, so align the staged tax that inclusive-tax spend checks read.
 		$staged_cart_tax = 0.0;
