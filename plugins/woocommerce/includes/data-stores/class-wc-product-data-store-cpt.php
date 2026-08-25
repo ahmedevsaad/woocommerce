@@ -1442,6 +1442,15 @@ class WC_Product_Data_Store_CPT extends WC_Data_Store_WP implements WC_Object_Da
 	 * is already over would only be undone by get_ending_sales() on the same run, and
 	 * the product would qualify again on every subsequent run.
 	 *
+	 * "Closed" is decided by the same comparison get_ending_sales() uses, and that is a
+	 * string comparison of the stored meta against the decimal rendering of the current
+	 * timestamp. It is exact for the timestamps the CRUD path writes; a value stored in
+	 * another shape, such as '2020-01-01' from an importer, is not read as closed here and
+	 * is not read as ended there either. Keeping the two identical is what matters: a
+	 * product excluded from starting but not matched by ending would be stranded in
+	 * neither queue. Do not narrow one side alone, and in particular do not bind either
+	 * comparison as %d while the other stays %s.
+	 *
 	 * @since 3.0.0
 	 * @return array
 	 */
