@@ -392,26 +392,43 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	/**
 	 * End-date values the clause treats as not-ended, in shapes that differ in PHP.
 	 *
-	 * All three sort above the decimal rendering of a timestamp, so the SQL returns the
-	 * product in every case. A PHP-side guard that decides "ended" for itself reads them
-	 * differently, which is the divergence these cases exist to catch. Measured:
+	 * All three sort above the decimal rendering of a timestamp, so the query returns the
+	 * product in every case and the consumer must write the price to settle it. A PHP-side
+	 * guard that decides "ended" for itself reads them differently, and that disagreement is
+	 * the churn these cases exist to catch. Every cell below was measured by mutating
+	 * `wc_apply_sale_state_for_product()` and running this test:
 	 *
-	 *                        | '2020-01-01' | '20200101' | '999999999'
-	 *   is_numeric-gated     | not caught   | caught     | caught
-	 *   date-object          | caught       | caught     | caught
+	 *                                                      | -01-01 | Ymd | 999999999
+	 *   is_numeric($v) && (int) $v > 0 && (int) $v < time() |   -    | yes |   yes
+	 *   get_date_on_sale_to( 'edit' )->getTimestamp()       |  yes   | yes |   yes
+	 *   DateTime::createFromFormat( 'Y-m-d', $v )           |  yes   |  -  |    -
+	 *   DateTime::createFromFormat( 'Ymd', $v )             |   -    | yes |    -
+	 *   strtotime( $v )                                     |  yes   | yes |    -
 	 *
-	 * The numeric values are the load-bearing ones: they catch both shapes. This branch
-	 * shipped the is_numeric-gated form once (e0995f88af, repaired in f2190e14f7), and
-	 * with only the calendar-date value present the suite stays green against it.
+	 * The first row is not hypothetical: this branch shipped that exact expression during
+	 * development and had to repair it. With only '2020-01-01' present the suite stayed
+	 * fully green against it, which is why the numeric values are here.
 	 *
-	 * '2020-01-01' is kept because it is the shape a date-parsing guard reads differently,
-	 * at the cost of one row. It is not proven to catch a shape the numerics miss, so if it
-	 * ever gets in the way, drop it rather than weakening the other two.
+	 * Why each row stays:
 	 *
-	 * Note '2020-01-01' stops sorting above `time()` on 2034-01-04, when the separator
-	 * loses to the digit in that position. '999999999' holds until 2286. Do not "simplify"
-	 * these to a far-future calendar date such as '9999-12-31': that parses as future, so
-	 * no guard reads it as ended and the case stops discriminating entirely.
+	 *  - '2020-01-01' is the sole catcher of a strict `Y-m-d` parser.
+	 *  - '20200101' is the sole catcher of a strict `Ymd` parser.
+	 *  - '999999999' catches no shape the other two miss. It is here because it is the only
+	 *    value that still sorts above a timestamp after 2034 (see below), so it keeps the
+	 *    first two rows covered once the others expire.
+	 *
+	 * Longevity, verified against the engine: '2020-01-01' stops sorting above `time()` at
+	 * Unix 2020000000 (2034-01-04 15:06:40 UTC), when the separator loses to the digit in
+	 * that position, and '20200101' follows at 2020010100 the same day. Both cases then fail
+	 * on the first assertion and need new values. '999999999' holds until 2286.
+	 *
+	 * Do not "simplify" these to a far-future calendar date such as '9999-12-31': that parses
+	 * as future, so no guard reads it as ended and the case stops discriminating entirely.
+	 *
+	 * Known limit: a guard doing a byte-wise `strcmp()` mirror of the query agrees with the
+	 * collation on every ASCII value, so no value here catches it. It only diverges on
+	 * collation-ignorable characters such as U+200B, and a fixture carrying an invisible
+	 * control character would be a worse hazard than the shape it guards.
 	 *
 	 * @return array<string, array{string}>
 	 */
