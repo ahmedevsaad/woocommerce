@@ -392,47 +392,40 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	/**
 	 * End-date values the clause treats as not-ended, in shapes that differ in PHP.
 	 *
-	 * All three sort above the decimal rendering of a timestamp, so the query returns the
-	 * product in every case and the consumer must write the price to settle it. A PHP-side
-	 * guard that decides "ended" for itself reads them differently, and that disagreement is
-	 * the churn these cases exist to catch. Every cell below was measured by mutating
-	 * `wc_apply_sale_state_for_product()` and running this test:
+	 * The query returns the product for all four, so the consumer must write the price to
+	 * settle it. A PHP-side guard that decides "ended" for itself reads them differently, and
+	 * that disagreement is the churn these cases exist to catch. Every cell below was measured
+	 * by mutating `wc_apply_sale_state_for_product()` and running this test:
 	 *
-	 *                                                      | -01-01 | Ymd | 999999999
-	 *   is_numeric($v) && (int) $v > 0 && (int) $v < time() |   -    | yes |   yes
-	 *   get_date_on_sale_to( 'edit' )->getTimestamp()       |  yes   | yes |   yes
-	 *   DateTime::createFromFormat( 'Y-m-d', $v )           |  yes   |  -  |    -
-	 *   DateTime::createFromFormat( 'Ymd', $v )             |   -    | yes |    -
-	 *   strtotime( $v )                                     |  yes   | yes |    -
+	 *                                                  | -01-01 | Ymd | 999999999 | 0000-00-00
+	 *   is_numeric($v) && (int) $v > 0 && (int) $v < t |   -    | yes |    yes    |     -
+	 *   get_date_on_sale_to( 'edit' )->getTimestamp()  |  yes   | yes |    yes    |    yes
+	 *   DateTime::createFromFormat( 'Y-m-d', $v )      |  yes   |  -  |     -     |    yes
+	 *   DateTime::createFromFormat( 'Ymd', $v )        |   -    | yes |     -     |     -
+	 *   strtotime( $v )                                |  yes   | yes |     -     |    yes
+	 *   strcmp( $v, (string) time() ) < 0              |   -    |  -  |     -     |    yes
+	 *   $v > 0 && strcmp( $v, (string) time() ) < 0    |   -    |  -  |     -     |    yes
 	 *
 	 * The first row is not hypothetical: this branch shipped that exact expression during
-	 * development and had to repair it. With only '2020-01-01' present the suite stayed
-	 * fully green against it, which is why the numeric values are here.
+	 * development and had to repair it. With only '2020-01-01' present the suite stayed fully
+	 * green against it.
 	 *
-	 * Why each row stays:
+	 * The last two rows are the byte-wise mirrors of the query itself, and '0000-00-00' is the
+	 * only value that catches them. It diverges through the `> 0` term rather than the date
+	 * comparison: MariaDB coerces it to 0 so the query reads "not ended", while PHP 8 compares
+	 * a non-numeric string against 0 as a string, making `$v > 0` true, and `strcmp` then puts
+	 * it below any timestamp. It is also the one value here that never expires, since it sorts
+	 * below every timestamp for the same reason.
 	 *
-	 *  - '2020-01-01' is the sole catcher of a strict `Y-m-d` parser.
-	 *  - '20200101' is the sole catcher of a strict `Ymd` parser.
-	 *  - '999999999' catches no shape the other two miss. It is here because it is the only
-	 *    value that still sorts above a timestamp after 2034 (see below), so it keeps the
-	 *    first two rows covered once the others expire.
-	 *
-	 * Longevity, verified against the engine: '2020-01-01' stops sorting above `time()` at
-	 * Unix 2020000000 (2034-01-04 15:06:40 UTC), when the separator loses to the digit in
-	 * that position, and '20200101' follows at 2020010100 the same day. Both cases then fail
-	 * on the first assertion and need new values. '999999999' holds until 2286.
+	 * Longevity of the rest, verified against the engine: '2020-01-01' stops sorting above
+	 * `time()` at Unix 2020000000 (2034-01-04 15:06:40 UTC), when the separator loses to the
+	 * digit in that position, and '20200101' follows at 2020010100 the same day. Both cases
+	 * then fail on the first assertion and need new values. '999999999' holds until 2286.
 	 *
 	 * Do not "simplify" these to a far-future calendar date such as '9999-12-31': that parses
 	 * as future, so no guard reads it as ended and the case stops discriminating entirely.
-	 *
-	 * Known limit: no value here catches a guard doing a byte-wise `strcmp()` mirror of the
-	 * query, and the reason is directional. Churn needs the mirror to read "ended" where the
-	 * query does not, which takes a byte the collation ignores that also sorts below '0'.
-	 * Only C0 control bytes qualify: an invisible character such as U+200B leads with a byte
-	 * above every digit, so it can only make the mirror more permissive, which cannot churn.
-	 * Measured, with the mirror guard and a current timestamp: a U+200B value agrees with the
-	 * query and settles, a 0x01 value diverges and re-queues. Catching that shape would mean
-	 * a fixture carrying a raw control byte, which is a worse hazard than the shape itself.
+	 * '20200101' is the sole catcher of a strict `Ymd` parser and '0000-00-00' of both mirror
+	 * shapes, so neither can be dropped without losing a row outright.
 	 *
 	 * @return array<string, array{string}>
 	 */
@@ -441,6 +434,7 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 			'calendar date' => array( '2020-01-01' ),
 			'compact date'  => array( '20200101' ),
 			'short numeric' => array( '999999999' ),
+			'zero date'     => array( '0000-00-00' ),
 		);
 	}
 
