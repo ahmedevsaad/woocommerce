@@ -113,7 +113,7 @@ class WC_REST_Orders_Controller extends WC_REST_Orders_V2_Controller {
 	 */
 	protected function validate_coupons_before_replacement( $order, $coupon_codes, $current_order_coupon_codes ) {
 		try {
-			// Direct instantiation, not wc_get_order(): the fabricated subtotals below must not
+			// Direct instantiation, not wc_get_order(): the fabricated cart tax below must not
 			// leak into a factory-cached instance. The class is still resolved through the
 			// factory so a substituted order class is mirrored here too.
 			$order_id    = $order->get_id();
