@@ -390,22 +390,59 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 	}
 
 	/**
-	 * @testdox A sale the query still returns is started once and then settles.
+	 * End-date values the clause treats as not-ended, in shapes that differ in PHP.
+	 *
+	 * All three sort above the decimal rendering of a timestamp, so the SQL returns the
+	 * product in every case. A PHP-side guard that decides "ended" for itself reads them
+	 * differently, which is the divergence these cases exist to catch. Measured:
+	 *
+	 *                        | '2020-01-01' | '20200101' | '999999999'
+	 *   is_numeric-gated     | not caught   | caught     | caught
+	 *   date-object          | caught       | caught     | caught
+	 *
+	 * The numeric values are the load-bearing ones: they catch both shapes. This branch
+	 * shipped the is_numeric-gated form once (e0995f88af, repaired in f2190e14f7), and
+	 * with only the calendar-date value present the suite stays green against it.
+	 *
+	 * '2020-01-01' is kept because it is the shape a date-parsing guard reads differently,
+	 * at the cost of one row. It is not proven to catch a shape the numerics miss, so if it
+	 * ever gets in the way, drop it rather than weakening the other two.
+	 *
+	 * Note '2020-01-01' stops sorting above `time()` on 2034-01-04, when the separator
+	 * loses to the digit in that position. '999999999' holds until 2286. Do not "simplify"
+	 * these to a far-future calendar date such as '9999-12-31': that parses as future, so
+	 * no guard reads it as ended and the case stops discriminating entirely.
+	 *
+	 * @return array<string, array{string}>
 	 */
-	public function test_wc_scheduled_sales_settles_a_sale_the_query_still_returns(): void {
-		// A full cycle through wc_scheduled_sales(), not just the query. '2020-01-01' sorts
-		// above the decimal rendering of a timestamp, so the clause treats it as not ended
-		// and the product is returned. The consumer must then write the price, which is what
-		// takes it out of the queue. Anything that decides "ended" differently from the query
-		// and skips that write leaves the product queued and firing the starting hooks on
-		// every run, which is the churn this fix removes.
+	public function provider_end_dates_the_query_still_returns(): array {
+		return array(
+			'calendar date' => array( '2020-01-01' ),
+			'compact date'  => array( '20200101' ),
+			'short numeric' => array( '999999999' ),
+		);
+	}
+
+	/**
+	 * @testdox A sale the query still returns is started once and then settles.
+	 *
+	 * @dataProvider provider_end_dates_the_query_still_returns
+	 *
+	 * @param string $date_to Stored `_sale_price_dates_to` value.
+	 */
+	public function test_wc_scheduled_sales_settles_a_sale_the_query_still_returns( string $date_to ): void {
+		// A full cycle through wc_scheduled_sales(), not just the query. The clause treats
+		// the stored value as not ended, so the product is returned. The consumer must then
+		// write the price, which is what takes it out of the queue. Anything that decides
+		// "ended" differently from the query and skips that write leaves the product queued
+		// and firing the starting hooks on every run, which is the churn this fix removes.
 		$product = WC_Helper_Product::create_simple_product();
 		$product->set_regular_price( 100 );
 		$product->set_sale_price( 50 );
 		$product->save();
 		update_post_meta( $product->get_id(), '_price', 100 );
 		update_post_meta( $product->get_id(), '_sale_price_dates_from', time() - 300 );
-		update_post_meta( $product->get_id(), '_sale_price_dates_to', '2020-01-01' );
+		update_post_meta( $product->get_id(), '_sale_price_dates_to', $date_to );
 
 		$started = array();
 		add_action(
@@ -416,11 +453,11 @@ class WC_Product_Functions_Tests extends \WC_Unit_Test_Case {
 		);
 
 		wc_scheduled_sales();
-		$this->assertContains( (string) $product->get_id(), $started, 'The first run should start the sale.' );
+		$this->assertContains( (string) $product->get_id(), $started, "The first run should start the sale: {$date_to}." );
 
 		$started = array();
 		wc_scheduled_sales();
-		$this->assertNotContains( (string) $product->get_id(), $started, 'The product must settle instead of being queued again.' );
+		$this->assertNotContains( (string) $product->get_id(), $started, "The product must settle instead of being queued again: {$date_to}." );
 
 		$data_store = WC_Data_Store::load( 'product' );
 		$this->assertNotContains( (string) $product->get_id(), $data_store->get_starting_sales() );
