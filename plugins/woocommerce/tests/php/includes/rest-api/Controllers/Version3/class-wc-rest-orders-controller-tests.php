@@ -1929,7 +1929,7 @@ class WC_REST_Orders_Controller_Tests extends WC_REST_Unit_Test_Case {
 			array(
 				'discount_type'        => 'percent',
 				'coupon_amount'        => '10',
-				'usage_limit_per_user' => '5',
+				'usage_limit_per_user' => '1',
 			)
 		);
 
