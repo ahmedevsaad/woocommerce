@@ -1,0 +1,4 @@
+Significance: patch
+Type: fix
+
+Calculate order editor percentage fees before tax, and treat fixed fees as tax-inclusive when prices are entered with tax.

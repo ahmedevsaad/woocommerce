@@ -1371,12 +1371,15 @@ class WC_AJAX {
 				'city'     => isset( $_POST['city'] ) ? wc_strtoupper( wc_clean( wp_unslash( $_POST['city'] ) ) ) : '',
 			);
 
-			if ( strstr( $amount, '%' ) ) {
+			$is_percent = (bool) strstr( $amount, '%' );
+
+			if ( $is_percent ) {
 				// We need to calculate totals first, so that $order->get_total() is correct.
 				$order->calculate_totals( false );
 				$formatted_amount = $amount;
 				$percent          = floatval( trim( $amount, '%' ) );
-				$amount           = $order->get_total() * ( $percent / 100 );
+				// Apply the percentage before tax, since tax is calculated on top of the fee.
+				$amount = ( (float) $order->get_total() - (float) $order->get_total_tax() ) * ( $percent / 100 );
 			} else {
 				$amount           = floatval( $amount );
 				$formatted_amount = wc_price( $amount, array( 'currency' => $order->get_currency() ) );
@@ -1390,6 +1393,20 @@ class WC_AJAX {
 
 			$order->add_item( $fee );
 			$order->calculate_taxes( $calculate_tax_args );
+
+			// With prices entered including tax, a fixed amount includes tax too, like product prices.
+			if ( ! $is_percent && $order->get_prices_include_tax() && 0.0 !== $amount && 0.0 !== (float) $fee->get_total_tax() ) {
+				// Tax is proportional to the fee, so get the rate from a large amount where rounding the tax doesn't matter.
+				$fee->set_total( 100000000 * ( $amount > 0 ? 1 : -1 ) );
+				$order->calculate_taxes( $calculate_tax_args );
+				$tax_rate = (float) $fee->get_total_tax() / (float) $fee->get_total();
+
+				// Keep the unrounded net amount, like product prices entered with tax, so recalculating gives the same tax.
+				$amount_excluding_tax = $amount / ( 1 + $tax_rate );
+				$fee->set_amount( $amount_excluding_tax );
+				$fee->set_total( $amount_excluding_tax );
+				$order->calculate_taxes( $calculate_tax_args );
+			}
 			$order->calculate_totals( false );
 			$order->save();
 

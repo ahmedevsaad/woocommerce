@@ -3499,4 +3499,119 @@ class WC_AJAX_Test extends \WP_Ajax_UnitTestCase {
 
 		return $result;
 	}
+
+	/**
+	 * @testdox A percentage fee added in the order editor applies to the order total before tax.
+	 */
+	public function test_add_order_fee_percentage_applies_before_tax(): void {
+		$order = $this->create_order_for_fee_tests( false );
+
+		$fee = $this->add_order_fee_via_ajax( $order, '-10%' );
+
+		// Items and shipping total 50 before tax, so -10% is -5 plus -1 tax at 20%.
+		$this->assertEqualsWithDelta( -5.0, (float) $fee->get_total(), 0.001 );
+		$this->assertEqualsWithDelta( -1.0, (float) $fee->get_total_tax(), 0.001 );
+	}
+
+	/**
+	 * @testdox A fixed fee added in the order editor includes tax when prices are entered including tax.
+	 */
+	public function test_add_order_fee_fixed_amount_includes_tax_when_prices_include_tax(): void {
+		$order = $this->create_order_for_fee_tests( true );
+
+		$fee = $this->add_order_fee_via_ajax( $order, '12' );
+
+		$this->assertEqualsWithDelta( 10.0, (float) $fee->get_total(), 0.001 );
+		$this->assertEqualsWithDelta( 2.0, (float) $fee->get_total_tax(), 0.001 );
+	}
+
+	/**
+	 * @testdox A tax-inclusive fee uses the exact net amount and keeps its tax when the order is recalculated.
+	 */
+	public function test_add_order_fee_fixed_amount_includes_tax_with_rounding(): void {
+		$order = $this->create_order_for_fee_tests( true );
+
+		$fee = $this->add_order_fee_via_ajax( $order, '5.01' );
+
+		$this->assertEqualsWithDelta( 4.175, (float) $fee->get_total(), 0.0001, 'The net amount should come from the exact rate.' );
+
+		$tax_before = (float) $fee->get_total_tax();
+		$order      = wc_get_order( $order->get_id() );
+		$order->calculate_taxes();
+		$fees = $order->get_fees();
+		$this->assertSame( $tax_before, (float) reset( $fees )->get_total_tax(), 'Recalculating should keep the fee tax.' );
+	}
+
+	/**
+	 * @testdox A fixed fee added in the order editor excludes tax when prices are entered excluding tax.
+	 */
+	public function test_add_order_fee_fixed_amount_excludes_tax_when_prices_exclude_tax(): void {
+		$order = $this->create_order_for_fee_tests( false );
+
+		$fee = $this->add_order_fee_via_ajax( $order, '12' );
+
+		$this->assertEqualsWithDelta( 12.0, (float) $fee->get_total(), 0.001 );
+		$this->assertEqualsWithDelta( 2.4, (float) $fee->get_total_tax(), 0.001 );
+	}
+
+	/**
+	 * Creates an order with a 20% tax rate for the order editor fee tests.
+	 *
+	 * @param bool $prices_include_tax Whether the order's prices include tax.
+	 * @return WC_Order
+	 */
+	private function create_order_for_fee_tests( bool $prices_include_tax ): WC_Order {
+		update_option( 'woocommerce_calc_taxes', 'yes' );
+		WC_Tax::_insert_tax_rate(
+			array(
+				'tax_rate_country'  => '',
+				'tax_rate_state'    => '',
+				'tax_rate'          => '20.0000',
+				'tax_rate_name'     => 'VAT',
+				'tax_rate_priority' => '1',
+				'tax_rate_compound' => '0',
+				'tax_rate_shipping' => '1',
+				'tax_rate_order'    => '1',
+				'tax_rate_class'    => '',
+			)
+		);
+
+		$order = WC_Helper_Order::create_order();
+		$order->set_prices_include_tax( $prices_include_tax );
+		$order->save();
+
+		return $order;
+	}
+
+	/**
+	 * Adds a fee to an order through the order editor AJAX action and returns it.
+	 *
+	 * @param WC_Order $order  Order.
+	 * @param string   $amount Fee amount, optionally a percentage.
+	 * @return WC_Order_Item_Fee
+	 */
+	private function add_order_fee_via_ajax( WC_Order $order, string $amount ): WC_Order_Item_Fee {
+		$this->_setRole( 'administrator' );
+
+		$_POST['security'] = wp_create_nonce( 'order-item' );
+		$_POST['order_id'] = $order->get_id();
+		$_POST['amount']   = $amount;
+
+		$output_buffering_level = ob_get_level();
+
+		try {
+			$this->_handleAjax( 'woocommerce_add_order_fee' );
+		} catch ( WPAjaxDieContinueException $e ) {
+			unset( $e );
+		} finally {
+			while ( ob_get_level() > $output_buffering_level ) {
+				ob_end_clean();
+			}
+		}
+
+		$fees = wc_get_order( $order->get_id() )->get_fees();
+		$this->assertCount( 1, $fees );
+
+		return reset( $fees );
+	}
 }
