@@ -1,0 +1,4 @@
+Significance: patch
+Type: fix
+
+Fix checkbox placement for custom checkout fields in Twenty Twenty-Two and Twenty Twenty-Three, and let Cart and Checkout blocks use the width set in the editor in Twenty Twenty-Three.
