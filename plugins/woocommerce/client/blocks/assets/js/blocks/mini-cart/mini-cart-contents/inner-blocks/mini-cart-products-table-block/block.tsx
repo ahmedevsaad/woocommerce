@@ -24,6 +24,7 @@ const Block = ( {
 				lineItems={ cartItems }
 				isLoading={ cartIsLoading }
 				className="wc-block-mini-cart-items"
+				isMiniCart
 			/>
 		</div>
 	);

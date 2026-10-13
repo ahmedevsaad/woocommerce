@@ -2668,7 +2668,7 @@ class WC_Cart_Test extends \WC_Unit_Test_Case {
 			woocommerce_mini_cart();
 			$html = ob_get_clean();
 
-			$this->assertStringContainsString( 'Mini Cart Any Product - huge, 1', $html, 'The merged name must render.' );
+			$this->assertStringContainsString( wptexturize( 'Mini Cart Any Product - huge, 1' ), $html, 'The merged name must render, formatted like other titles.' );
 			$this->assertStringNotContainsString( '<dl class="variation"', $html, 'No variation meta list must render for values already in the name.' );
 		} finally {
 			$variation->delete( true );
@@ -2764,5 +2764,34 @@ class WC_Cart_Test extends \WC_Unit_Test_Case {
 			$skipped_child->delete( true );
 			$first_child->delete( true );
 		}
+	}
+
+	/**
+	 * @testdox Cart, Mini-Cart, and checkout templates filter product names with the_title, like other product titles.
+	 */
+	public function test_cart_templates_filter_product_names_with_the_title(): void {
+		$product = WC_Helper_Product::create_simple_product();
+		$product->set_name( 'Original name' );
+		$product->save();
+
+		WC()->cart->empty_cart();
+		WC()->cart->add_to_cart( $product->get_id() );
+
+		$filter = function ( $title, $id = null ) use ( $product ) {
+			return $product->get_id() === (int) $id ? 'Filtered name' : $title;
+		};
+		add_filter( 'the_title', $filter, 10, 2 );
+
+		foreach ( array( 'cart/cart.php', 'cart/mini-cart.php', 'checkout/review-order.php' ) as $template ) {
+			ob_start();
+			wc_get_template( $template, array( 'list_class' => '' ) );
+			$html = ob_get_clean();
+
+			$this->assertStringContainsString( 'Filtered name', $html, "$template should filter the product name." );
+			$this->assertStringNotContainsString( 'Original name', $html, "$template should not show the unfiltered name." );
+		}
+
+		remove_filter( 'the_title', $filter, 10 );
+		WC()->cart->empty_cart();
 	}
 }

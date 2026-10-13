@@ -38,6 +38,7 @@ The `cartItemClass` filter allows to change the cart item class.
     -   _cart_ `object` - The cart object from `wc/store/cart`, see Cart object.
     -   _cartItem_ `object` - The cart item object from `wc/store/cart`, see Cart Item object.
     -   _context_ `string` (allowed values: `cart` or `summary`) - The context of the item.
+    -   _isMiniCart_ `boolean` - `true` when the item is shown in the Mini-Cart, where _context_ is also `cart`.
 
 ### Returns {/* omit in toc */}
 
@@ -116,6 +117,7 @@ The `cartItemPrice` filter allows to format the cart item price.
     -   _cart_ `object` - The cart object from `wc/store/cart`, see Cart object.
     -   _cartItem_ `object` - The cart item object from `wc/store/cart`, see Cart Item object.
     -   _context_ `string` (allowed values: `cart` or `summary`) - The context of the item.
+    -   _isMiniCart_ `boolean` - `true` when the item is shown in the Mini-Cart, where _context_ is also `cart`.
 -   _validation_ `boolean` - Checks if the return value contains the substring `<price/>`.
 
 ### Returns {/* omit in toc */}
@@ -194,6 +196,7 @@ The `itemName` filter allows to change the cart item name.
     -   _cart_ `object` - The cart object from `wc/store/cart`, see Cart object.
     -   _cartItem_ `object` - The cart item object from `wc/store/cart`, see Cart Item object.
     -   _context_ `string` (allowed values: `cart` or `summary`) - The context of the item.
+    -   _isMiniCart_ `boolean` - `true` when the item is shown in the Mini-Cart, where _context_ is also `cart`.
 
 ### Returns {/* omit in toc */}
 
@@ -271,6 +274,7 @@ The `saleBadgePriceFormat` filter allows to format the cart item sale badge pric
     -   _cart_ `object` - The cart object from `wc/store/cart`, see Cart object.
     -   _cartItem_ `object` - The cart item object from `wc/store/cart`, see Cart Item object.
     -   _context_ `string` (allowed values: `cart` or `summary`) - The context of the item.
+    -   _isMiniCart_ `boolean` - `true` when the item is shown in the Mini-Cart, where _context_ is also `cart`.
 -   _validation_ `boolean` - Checks if the return value contains the substring `<price/>`.
 
 ### Returns {/* omit in toc */}
@@ -358,6 +362,7 @@ The `showRemoveItemLink` is used to show or hide the cart item remove link.
     -   _cart_ `object` - The cart object from `wc/store/cart`, see Cart object.
     -   _cartItem_ `object` - The cart item object from `wc/store/cart`, see Cart Item object.
     -   _context_ `string` (allowed values: `cart` or `summary`) - The context of the item.
+    -   _isMiniCart_ `boolean` - `true` when the item is shown in the Mini-Cart, where _context_ is also `cart`.
 
 ### Returns {/* omit in toc */}
 
@@ -437,6 +442,7 @@ The `subtotalPriceFormat` filter allows to format the cart item subtotal price.
     -   _cart_ `object` - The cart object from `wc/store/cart`, see Cart object.
     -   _cartItem_ `object` - The cart item object from `wc/store/cart`, see Cart Item object.
     -   _context_ `string` (allowed values: `cart` or `summary`) - The context of the item.
+    -   _isMiniCart_ `boolean` - `true` when the item is shown in the Mini-Cart, where _context_ is also `cart`.
 -   _validation_ `boolean` - Checks if the return value contains the substring `<price/>`.
 
 ### Returns {/* omit in toc */}

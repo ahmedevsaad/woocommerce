@@ -1,0 +1,4 @@
+Significance: minor
+Type: tweak
+
+Apply the_title filter to product names in the cart, Mini-Cart, checkout review, and grouped product list, and tell cart item filters when they run in the Mini-Cart.

@@ -14,7 +14,7 @@
  *
  * @see     https://woocommerce.com/document/template-structure/
  * @package WooCommerce\Templates
- * @version 11.2.0
+ * @version 11.3.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -42,7 +42,16 @@ do_action( 'woocommerce_before_mini_cart' ); ?>
 			$visible = apply_filters( 'woocommerce_widget_cart_item_visible', true, $cart_item, $cart_item_key );
 
 			if ( $_product instanceof WC_Product && $_product->exists() && $cart_item['quantity'] > 0 && $visible ) {
-				$cart_item_name = WC()->cart->get_item_product_name( $cart_item, $_product );
+				$cart_item_raw_name = WC()->cart->get_item_product_name( $cart_item, $_product );
+
+				/**
+				 * Filters the product name with the WordPress the_title filter, as product titles are elsewhere.
+				 *
+				 * @since 11.3.0
+				 * @param string $title Product name.
+				 * @param int    $id    Product ID.
+				 */
+				$cart_item_name = apply_filters( 'the_title', $cart_item_raw_name, $_product->get_id() );
 				/**
 				 * This filter is documented in woocommerce/templates/cart/cart.php.
 				 *
@@ -78,7 +87,7 @@ do_action( 'woocommerce_before_mini_cart' ); ?>
 							<?php echo $thumbnail . wp_kses_post( $product_name ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</a>
 					<?php endif; ?>
-					<?php echo wc_get_formatted_cart_item_data( $cart_item, false, $cart_item_name ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<?php echo wc_get_formatted_cart_item_data( $cart_item, false, $cart_item_raw_name ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<?php echo apply_filters( 'woocommerce_widget_cart_item_quantity', '<span class="quantity">' . sprintf( '%s &times; %s', $cart_item['quantity'], $product_price ) . '</span>', $cart_item, $cart_item_key ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				</li>
 				<?php

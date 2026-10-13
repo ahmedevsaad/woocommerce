@@ -12,7 +12,7 @@
  *
  * @see     https://woocommerce.com/document/template-structure/
  * @package WooCommerce\Templates
- * @version 11.0.0
+ * @version 11.3.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -102,8 +102,17 @@ do_action( 'woocommerce_before_add_to_cart_form' ); ?>
 							$value = ob_get_clean();
 							break;
 						case 'label':
+							/**
+							 * Filters the product name with the WordPress the_title filter, as product titles are elsewhere.
+							 *
+							 * @since 11.3.0
+							 * @param string $title Product name.
+							 * @param int    $id    Product ID.
+							 */
+							$grouped_product_child_name = apply_filters( 'the_title', $grouped_product_child->get_name(), $grouped_product_child->get_id() );
+
 							$value  = '<label for="product-' . esc_attr( $grouped_product_child->get_id() ) . '">';
-							$value .= $grouped_product_child->is_visible() ? '<a href="' . esc_url( apply_filters( 'woocommerce_grouped_product_list_link', $grouped_product_child->get_permalink(), $grouped_product_child->get_id() ) ) . '">' . $grouped_product_child->get_name() . '</a>' : $grouped_product_child->get_name();
+							$value .= $grouped_product_child->is_visible() ? '<a href="' . esc_url( apply_filters( 'woocommerce_grouped_product_list_link', $grouped_product_child->get_permalink(), $grouped_product_child->get_id() ) ) . '">' . $grouped_product_child_name . '</a>' : $grouped_product_child_name; // phpcs:ignore WooCommerce.Commenting.CommentHooks.MissingHookComment -- Existing hook; only the name changed on this line.
 							$value .= '</label>';
 							break;
 						case 'price':

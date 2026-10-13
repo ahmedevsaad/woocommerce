@@ -12,7 +12,7 @@
  *
  * @see     https://woocommerce.com/document/template-structure/
  * @package WooCommerce\Templates
- * @version 11.2.0
+ * @version 11.3.0
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -52,7 +52,16 @@ do_action( 'woocommerce_before_cart' ); ?>
 				$visible = apply_filters( 'woocommerce_cart_item_visible', true, $cart_item, $cart_item_key );
 
 				if ( $_product instanceof WC_Product && $_product->exists() && $cart_item['quantity'] > 0 && $visible ) {
-					$cart_item_name = WC()->cart->get_item_product_name( $cart_item, $_product );
+					$cart_item_raw_name = WC()->cart->get_item_product_name( $cart_item, $_product );
+
+					/**
+					 * Filters the product name with the WordPress the_title filter, as product titles are elsewhere.
+					 *
+					 * @since 11.3.0
+					 * @param string $title Product name.
+					 * @param int    $id    Product ID.
+					 */
+					$cart_item_name = apply_filters( 'the_title', $cart_item_raw_name, $_product->get_id() );
 
 					/**
 					 * Filter the product name.
@@ -126,7 +135,7 @@ do_action( 'woocommerce_before_cart' ); ?>
 
 						// Meta data.
 						// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-						echo wc_get_formatted_cart_item_data( $cart_item, false, $cart_item_name );
+						echo wc_get_formatted_cart_item_data( $cart_item, false, $cart_item_raw_name );
 
 						// Backorder notification.
 						if ( $_product->backorders_require_notification() && $_product->is_on_backorder( $cart_item['quantity'] ) ) {

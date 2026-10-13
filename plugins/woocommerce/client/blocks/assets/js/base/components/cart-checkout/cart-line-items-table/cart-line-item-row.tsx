@@ -55,6 +55,10 @@ interface CartLineItemRowProps {
 	lineItem: CartItem | Record< string, never >;
 	onRemove?: () => void;
 	tabIndex?: number;
+	/**
+	 * Whether the row is rendered in the Mini-Cart, passed to checkout filters as `isMiniCart`.
+	 */
+	isMiniCart?: boolean;
 }
 
 /**
@@ -64,7 +68,7 @@ const CartLineItemRow: React.ForwardRefExoticComponent<
 	CartLineItemRowProps & React.RefAttributes< HTMLTableRowElement >
 > = forwardRef< HTMLTableRowElement, CartLineItemRowProps >(
 	(
-		{ lineItem, onRemove = () => void null, tabIndex },
+		{ lineItem, onRemove = () => void null, tabIndex, isMiniCart = false },
 		ref
 	): JSX.Element => {
 		const {
@@ -154,8 +158,9 @@ const CartLineItemRow: React.ForwardRefExoticComponent<
 				context: 'cart',
 				cartItem: lineItem,
 				cart,
+				isMiniCart,
 			} ),
-			[ lineItem, cart ]
+			[ lineItem, cart, isMiniCart ]
 		);
 		const priceCurrency = getCurrencyFromPriceResponse( prices );
 		const name = applyCheckoutFilter( {

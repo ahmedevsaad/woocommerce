@@ -19,6 +19,7 @@ interface CartLineItemsTableProps {
 	lineItems: CartResponseItem[];
 	isLoading: boolean;
 	className?: string;
+	isMiniCart?: boolean;
 }
 
 const setRefs = ( lineItems: CartResponseItem[] ) => {
@@ -33,6 +34,7 @@ const CartLineItemsTable = ( {
 	lineItems = [],
 	isLoading = false,
 	className,
+	isMiniCart = false,
 }: CartLineItemsTableProps ): JSX.Element => {
 	const tableRef = useRef< HTMLTableElement | null >( null );
 	const rowRefs = useRef( setRefs( lineItems ) );
@@ -74,6 +76,7 @@ const CartLineItemsTable = ( {
 							onRemove={ onRemoveRow( nextItemKey ) }
 							ref={ rowRefs.current[ lineItem.key ] }
 							tabIndex={ -1 }
+							isMiniCart={ isMiniCart }
 						/>
 					);
 				} ) }

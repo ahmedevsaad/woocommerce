@@ -508,6 +508,7 @@ const { state: cartItemState } = store(
 								extensions,
 								arg: {
 									context: 'cart',
+									isMiniCart: true,
 									cartItem: cartItemState.cartItem,
 									cart: woocommerceState.cart,
 								},
@@ -589,6 +590,7 @@ const { state: cartItemState } = store(
 								extensions: cartItemState.cartItem.extensions,
 								arg: {
 									context: 'cart',
+									isMiniCart: true,
 									cartItem: cartItemState.cartItem,
 									cart: woocommerceState.cart,
 								},
@@ -669,6 +671,7 @@ const { state: cartItemState } = store(
 								extensions: cartItemState.cartItem.extensions,
 								arg: {
 									context: 'cart',
+									isMiniCart: true,
 									cartItem: cartItemState.cartItem,
 									cart: woocommerceState.cart,
 								},
@@ -695,6 +698,7 @@ const { state: cartItemState } = store(
 								extensions: cartItemState.cartItem.extensions,
 								arg: {
 									context: 'cart',
+									isMiniCart: true,
 									cartItem: cartItemState.cartItem,
 									cart: woocommerceState.cart,
 								},
@@ -748,6 +752,7 @@ const { state: cartItemState } = store(
 								extensions: cartItemState.cartItem.extensions,
 								arg: {
 									context: 'cart',
+									isMiniCart: true,
 									cartItem: cartItemState.cartItem,
 									cart: woocommerceState.cart,
 								},
@@ -782,6 +787,7 @@ const { state: cartItemState } = store(
 								extensions: cartItemState.cartItem.extensions,
 								arg: {
 									context: 'cart',
+									isMiniCart: true,
 									cartItem: cartItemState.cartItem,
 									cart: woocommerceState.cart,
 								},
@@ -1004,6 +1010,7 @@ const { state: cartItemState } = store(
 							extensions: cartItemState.cartItem.extensions,
 							arg: {
 								context: 'cart',
+								isMiniCart: true,
 								cartItem: cartItemState.cartItem,
 								cart: woocommerceState.cart,
 							},
