@@ -1577,6 +1577,10 @@ class WC_Cart extends WC_Legacy_Cart {
 			return $this->remove_cart_item( $cart_item_key );
 		}
 
+		if ( ! isset( $this->cart_contents[ $cart_item_key ] ) ) {
+			return false;
+		}
+
 		// Update qty.
 		$old_quantity                                      = $this->cart_contents[ $cart_item_key ]['quantity'];
 		$this->cart_contents[ $cart_item_key ]['quantity'] = $quantity;

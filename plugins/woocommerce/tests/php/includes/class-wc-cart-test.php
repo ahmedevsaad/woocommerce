@@ -3063,4 +3063,51 @@ class WC_Cart_Test extends \WC_Unit_Test_Case {
 		$this->assertFalse( $cart_item_key, 'Add to cart should reject a variation when an earlier variation matches.' );
 		$this->assertSame( 'The selected options belong to a different variation of this product.', wc_get_notices( 'error' )[0]['notice'] );
 	}
+
+	/**
+	 * @testdox Set quantity returns false and leaves the cart unchanged for an unknown cart item key.
+	 */
+	public function test_set_quantity_returns_false_for_unknown_cart_item_key(): void {
+		$product       = WC_Helper_Product::create_simple_product();
+		$cart_item_key = WC()->cart->add_to_cart( $product->get_id(), 1 );
+		$hook_calls    = 0;
+		$count_hook    = function () use ( &$hook_calls ) {
+			++$hook_calls;
+		};
+		add_action( 'woocommerce_after_cart_item_quantity_update', $count_hook );
+		add_action( 'woocommerce_cart_item_set_quantity', $count_hook );
+
+		try {
+			$result = WC()->cart->set_quantity( 'this-key-is-not-in-the-cart', 2 );
+
+			$this->assertFalse( $result, 'An unknown cart item key should not be updated.' );
+			$this->assertSame( array( $cart_item_key ), array_keys( WC()->cart->get_cart_contents() ), 'No cart entry should be created for an unknown key.' );
+			$this->assertSame( 1, WC()->cart->get_cart_item( $cart_item_key )['quantity'], 'The existing item should keep its quantity.' );
+			$this->assertSame( 0, $hook_calls, 'Quantity update hooks should not fire for an unknown key.' );
+
+			WC()->cart->calculate_totals();
+			$this->assertSame( 1, WC()->cart->get_cart_contents_count(), 'Totals should still calculate for the existing item.' );
+		} finally {
+			remove_action( 'woocommerce_after_cart_item_quantity_update', $count_hook );
+			remove_action( 'woocommerce_cart_item_set_quantity', $count_hook );
+			WC()->cart->empty_cart();
+			$product->delete( true );
+		}
+	}
+
+	/**
+	 * @testdox Set quantity still updates an item that is in the cart.
+	 */
+	public function test_set_quantity_updates_existing_cart_item(): void {
+		$product       = WC_Helper_Product::create_simple_product();
+		$cart_item_key = WC()->cart->add_to_cart( $product->get_id(), 1 );
+
+		try {
+			$this->assertTrue( WC()->cart->set_quantity( $cart_item_key, 3 ) );
+			$this->assertSame( 3, WC()->cart->get_cart_item( $cart_item_key )['quantity'] );
+		} finally {
+			WC()->cart->empty_cart();
+			$product->delete( true );
+		}
+	}
 }
